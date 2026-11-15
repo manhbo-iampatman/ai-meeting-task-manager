@@ -4,6 +4,7 @@
 
 - Kế hoạch chi tiết: [docs/KE_HOACH_PHUONG_AN_B.md](docs/KE_HOACH_PHUONG_AN_B.md)
 - Giải thích kiến thức Giai đoạn 0: [docs/GIAI_THICH_GIAI_DOAN_0.md](docs/GIAI_THICH_GIAI_DOAN_0.md)
+- Giải thích kiến thức Giai đoạn 2: [docs/GIAI_THICH_GIAI_DOAN_2.md](docs/GIAI_THICH_GIAI_DOAN_2.md)
 
 ## Cấu trúc
 
@@ -33,7 +34,9 @@ py -3.12 -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 pip install -r requirements-ai.txt     # thư viện AI, ~2GB
-copy .env.example .env                 # rồi điền GEMINI_API_KEY
+copy .env.example .env                 # rồi điền GEMINI_API_KEY, JWT_SECRET
+alembic upgrade head                   # tạo bảng trong CSDL
+python scripts\seed_demo.py            # (tuỳ chọn) dữ liệu demo — đăng nhập nam@example.com / demo1234
 
 # 3. Frontend
 cd ../frontend
@@ -48,7 +51,8 @@ npm install
 | 2. Worker AI | `backend` | `.venv\Scripts\activate` rồi `python -m app.workers.worker` |
 | 3. Frontend | `frontend` | `npm run dev` |
 
-Mở http://localhost:5173 — trang trạng thái hệ thống cho biết thành phần nào đang chạy.
+Mở http://localhost:5173 để dùng ứng dụng. Trang http://localhost:5173/status cho biết thành phần nào đang chạy.
+(Nhớ mở Docker Desktop trước. PostgreSQL của dự án chạy ở cổng **5433**.)
 Tài liệu API (Swagger): http://localhost:8000/docs
 
 ## Kiểm tra nhanh

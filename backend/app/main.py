@@ -7,7 +7,7 @@ Tài liệu API tự sinh (Swagger):  http://localhost:8000/docs
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import health
+from app.api.routes import auth, boards, health, notifications, realtime, tasks, workspaces
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -28,4 +28,5 @@ app.add_middleware(
 )
 
 # Mọi API đều có tiền tố /api
-app.include_router(health.router, prefix="/api")
+for r in (health, auth, workspaces, boards, tasks, notifications, realtime):
+    app.include_router(r.router, prefix="/api")

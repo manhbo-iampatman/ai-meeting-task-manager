@@ -8,9 +8,9 @@ export default defineConfig({
   server: {
     port: 5173,
     // Mọi request bắt đầu bằng /api được chuyển tới backend FastAPI (cổng 8000).
-    // Nhờ vậy frontend gọi "/api/..." mà không lo khác cổng.
+    // ws: true → chuyển tiếp cả kết nối WebSocket (cập nhật bảng realtime).
     proxy: {
-      '/api': 'http://localhost:8000',
+      '/api': { target: 'http://localhost:8000', ws: true },
     },
   },
 })

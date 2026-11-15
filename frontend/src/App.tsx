@@ -1,13 +1,30 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import Layout from './components/Layout'
+import AuthPage from './pages/AuthPage'
+import BoardPage from './pages/BoardPage'
+import JoinPage from './pages/JoinPage'
+import MyTasksPage from './pages/MyTasksPage'
 import StatusPage from './pages/StatusPage'
+import WorkspacePage from './pages/WorkspacePage'
+import WorkspacesPage from './pages/WorkspacesPage'
 
 // Bảng định tuyến: mỗi đường dẫn (URL) ứng với 1 trang.
-// Giai đoạn 2 sẽ thêm: /login, /workspaces/:id, /boards/:id, /meetings/:id ...
+// Các trang nằm trong <Layout> bắt buộc đăng nhập.
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<StatusPage />} />
+        <Route path="/login" element={<AuthPage mode="login" />} />
+        <Route path="/register" element={<AuthPage mode="register" />} />
+        <Route path="/status" element={<StatusPage />} />
+        <Route element={<Layout />}>
+          <Route path="/" element={<WorkspacesPage />} />
+          <Route path="/workspaces/:id" element={<WorkspacePage />} />
+          <Route path="/boards/:id" element={<BoardPage />} />
+          <Route path="/my-tasks" element={<MyTasksPage />} />
+          <Route path="/join/:code" element={<JoinPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   )

@@ -16,3 +16,8 @@ rq>=2.0
 # --- Test ---
 pytest>=8.3
 httpx>=0.28
+
+# --- Bảo mật / xác thực ---
+pyjwt>=2.10                   # tạo và kiểm tra JWT
+bcrypt>=4.2                   # băm mật khẩu
+email-validator>=2.2          # kiểm tra định dạng email (EmailStr)
