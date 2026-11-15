@@ -1,0 +1,38 @@
+# Chạy cơ sở dữ liệu và hàng đợi cho môi trường phát triển.
+# Lệnh:  docker compose up -d     (bật)
+#        docker compose down      (tắt, giữ dữ liệu)
+#
+# Backend và worker AI chạy TRỰC TIẾP trên Windows (không trong Docker)
+# để dùng được GPU RTX 3050 dễ dàng.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: meetflow-postgres
+    environment:
+      POSTGRES_USER: meetflow
+      POSTGRES_PASSWORD: meetflow
+      POSTGRES_DB: meetflow
+    ports:
+      - "5433:5432"   # máy đã có PostgreSQL cài sẵn chiếm cổng 5432 → dùng 5433
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meetflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: meetflow-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:

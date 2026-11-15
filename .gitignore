@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+
+# Môi trường / bí mật — KHÔNG commit API key
+.env
+!.env.example
+
+# Dữ liệu sinh ra khi chạy
+backend/uploads/
+backend/models_cache/
+experiments/data/
+*.wav
+*.mp3
+*.m4a
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Cấu hình riêng của Claude Code trên máy này
+.claude/

@@ -1,0 +1,13 @@
+# Thư viện AI — tách riêng vì nặng (vài GB).
+# Cài sau requirements.txt:  pip install -r requirements-ai.txt
+
+faster-whisper>=1.1           # Whisper tối ưu (CTranslate2)
+av<16                         # PyAV đọc audio; bản >=16 bỏ tham số faster-whisper đang dùng
+
+# Thư viện CUDA cho GPU NVIDIA — cài qua pip, KHÔNG cần cài CUDA Toolkit
+nvidia-cublas-cu12
+nvidia-cudnn-cu12==9.*
+
+google-genai>=1.0             # Gemini API
+rapidfuzz>=3.10               # so khớp tên mờ (fuzzy)
+dateparser>=1.2               # phân tích ngày tháng
