@@ -5,11 +5,14 @@ import type {
   BoardDetail,
   Column,
   Comment,
+  Meeting,
+  MeetingDetail,
   Member,
   MyTask,
   Notification,
   NotificationList,
   Priority,
+  Segment,
   Task,
   TaskDetail,
   TokenResponse,
@@ -80,3 +83,34 @@ export const myTasks = (includeDone = false) =>
 export const listNotifications = () => data(api.get<NotificationList>('/notifications'))
 export const markNotificationRead = (id: number) => data(api.post<Notification>(`/notifications/${id}/read`))
 export const markAllRead = () => api.post('/notifications/read-all')
+
+// ---- Cuộc họp ----
+export const listMeetings = (workspaceId: number) =>
+  data(api.get<Meeting[]>(`/workspaces/${workspaceId}/meetings`))
+export const createMeeting = (
+  workspaceId: number,
+  form: { title: string; meeting_date: string; file?: File | null; text?: string; recorded?: boolean },
+  onUploadProgress?: (pct: number) => void,
+) => {
+  const fd = new FormData()
+  fd.append('title', form.title)
+  fd.append('meeting_date', form.meeting_date)
+  if (form.file) fd.append('file', form.file)
+  if (form.text) fd.append('text', form.text)
+  if (form.recorded) fd.append('recorded', 'true')
+  return data(
+    api.post<MeetingDetail>(`/workspaces/${workspaceId}/meetings`, fd, {
+      onUploadProgress: (e) => e.total && onUploadProgress?.(Math.round((e.loaded / e.total) * 100)),
+    }),
+  )
+}
+export const getMeeting = (id: number) => data(api.get<MeetingDetail>(`/meetings/${id}`))
+export const updateMeeting = (id: number, body: { title?: string; meeting_date?: string }) =>
+  data(api.patch<MeetingDetail>(`/meetings/${id}`, body))
+export const deleteMeeting = (id: number) => api.delete(`/meetings/${id}`)
+export const retryMeeting = (id: number) => data(api.post<MeetingDetail>(`/meetings/${id}/retry`))
+export const updateTranscript = (id: number, segments: Segment[]) =>
+  data(api.put<MeetingDetail>(`/meetings/${id}/transcript`, { segments }))
+/** Thẻ <audio> không gửi được header → đưa token vào URL. */
+export const meetingAudioUrl = (id: number, token: string) =>
+  `/api/meetings/${id}/audio?token=${encodeURIComponent(token)}`

@@ -36,5 +36,9 @@ class STTProvider(Protocol):
     name: str
 
     def transcribe(
-        self, audio_path: str, language: str | None = "vi", on_progress: ProgressCallback | None = None
+        self,
+        audio_path: str,
+        language: str | None = "vi",
+        on_progress: ProgressCallback | None = None,
+        initial_prompt: str | None = None,
     ) -> TranscriptResult: ...

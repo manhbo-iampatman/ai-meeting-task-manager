@@ -4,7 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Response, status
 from sqlalchemy import func, select
 
 from app.api.deps import DB, CurrentUser, get_board_for_member, get_column_for_member, get_membership
-from app.core.realtime import manager
+from app.core.realtime import board_room, manager
 from app.models import Board, BoardColumn, Task, TaskComment, Workspace, WorkspaceMember
 from app.schemas.board import (
     BoardCreate,
@@ -24,7 +24,7 @@ router = APIRouter(tags=["boards"])
 
 def board_changed(background: BackgroundTasks, board_id: int, user_id: int, kind: str = "board_updated") -> None:
     """Sau khi trả response, báo cho mọi người đang mở bảng biết để tải lại."""
-    background.add_task(manager.broadcast, board_id, {"type": kind, "board_id": board_id, "by": user_id})
+    background.add_task(manager.broadcast, board_room(board_id), {"type": kind, "board_id": board_id, "by": user_id})
 
 
 def build_board_detail(db: DB, board: Board) -> BoardDetail:

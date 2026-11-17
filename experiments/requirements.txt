@@ -1,0 +1,4 @@
+# Thư viện cho thí nghiệm (cài vào .venv của backend)
+edge-tts>=7.0      # sinh giọng đọc tiếng Việt cho cuộc họp giả lập
+jiwer>=3.0         # tính WER
+httpx>=0.28        # eval_wer.py --meeting: lấy bản ghi từ API

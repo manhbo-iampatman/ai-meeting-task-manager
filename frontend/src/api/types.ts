@@ -106,3 +106,37 @@ export type Notification = {
 }
 
 export type NotificationList = { unread_count: number; items: Notification[] }
+
+// ---- Cuộc họp (Giai đoạn 3) ----
+export type MeetingStatus = 'uploaded' | 'queued' | 'transcribing' | 'transcribed' | 'failed'
+
+export type Segment = { start: number | null; end: number | null; text: string }
+
+export type Transcript = {
+  full_text: string
+  segments: Segment[]
+  language: string | null
+  stt_model: string | null
+  duration_sec: number | null
+  processing_sec: number | null
+  edited: boolean
+  updated_at: string
+}
+
+export type Meeting = {
+  id: number
+  workspace_id: number
+  title: string
+  meeting_date: string
+  source_type: 'audio' | 'recording' | 'text'
+  status: MeetingStatus
+  progress: number
+  error: string | null
+  audio_filename: string | null
+  audio_size: number | null
+  created_by: number | null
+  created_at: string
+  duration_sec: number | null
+}
+
+export type MeetingDetail = Meeting & { has_audio: boolean; transcript: Transcript | null }

@@ -58,3 +58,19 @@ export function timeAgo(iso: string): string {
   if (s < 86400) return `${Math.floor(s / 3600)} giờ trước`
   return `${Math.floor(s / 86400)} ngày trước`
 }
+
+/** 75.4 → "1:15", 3725 → "1:02:05" */
+export function formatClock(sec: number | null | undefined): string {
+  if (sec == null || Number.isNaN(sec)) return '--:--'
+  const s = Math.floor(sec)
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const r = String(s % 60).padStart(2, '0')
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${r}` : `${m}:${r}`
+}
+
+export function formatBytes(n: number | null | undefined): string {
+  if (!n) return ''
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
+  return `${(n / 1024 / 1024).toFixed(1)} MB`
+}

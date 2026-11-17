@@ -3,6 +3,7 @@ import Layout from './components/Layout'
 import AuthPage from './pages/AuthPage'
 import BoardPage from './pages/BoardPage'
 import JoinPage from './pages/JoinPage'
+import MeetingPage from './pages/MeetingPage'
 import MyTasksPage from './pages/MyTasksPage'
 import StatusPage from './pages/StatusPage'
 import WorkspacePage from './pages/WorkspacePage'
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/workspaces/:id" element={<WorkspacePage />} />
           <Route path="/boards/:id" element={<BoardPage />} />
           <Route path="/my-tasks" element={<MyTasksPage />} />
+          <Route path="/meetings/:id" element={<MeetingPage />} />
           <Route path="/join/:code" element={<JoinPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

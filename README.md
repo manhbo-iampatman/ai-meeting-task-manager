@@ -5,6 +5,7 @@
 - Kế hoạch chi tiết: [docs/KE_HOACH_PHUONG_AN_B.md](docs/KE_HOACH_PHUONG_AN_B.md)
 - Giải thích kiến thức Giai đoạn 0: [docs/GIAI_THICH_GIAI_DOAN_0.md](docs/GIAI_THICH_GIAI_DOAN_0.md)
 - Giải thích kiến thức Giai đoạn 2: [docs/GIAI_THICH_GIAI_DOAN_2.md](docs/GIAI_THICH_GIAI_DOAN_2.md)
+- Giải thích kiến thức Giai đoạn 3: [docs/GIAI_THICH_GIAI_DOAN_3.md](docs/GIAI_THICH_GIAI_DOAN_3.md)
 
 ## Cấu trúc
 
@@ -45,6 +46,8 @@ npm install
 
 ## Chạy hằng ngày (3 cửa sổ terminal)
 
+Không có Worker AI thì vẫn dùng được bảng công việc, nhưng cuộc họp tải lên sẽ đứng ở trạng thái "Đang chờ xử lý".
+
 | Terminal | Thư mục | Lệnh |
 |---|---|---|
 | 1. Backend API | `backend` | `.venv\Scripts\activate` rồi `uvicorn app.main:app --reload` |
@@ -61,4 +64,11 @@ Tài liệu API (Swagger): http://localhost:8000/docs
 cd backend
 .venv\Scripts\python -m pytest                         # test backend
 .venv\Scripts\python scripts\test_whisper.py file.mp3  # chạy thử Whisper trên GPU
+```
+
+## Dữ liệu thử nghiệm
+
+```bash
+backend\.venv\Scripts\pip install -r experiments\requirements.txt
+backend\.venv\Scripts\python experiments\make_sample_meeting.py   # sinh cuộc họp tiếng Việt giả lập + đáp án chuẩn
 ```

@@ -315,3 +315,29 @@ D:\KLTN\DT2\
 - **Chương 3. Phân tích và thiết kế:** use case, ERD, kiến trúc, pipeline AI, giao diện
 - **Chương 4. Cài đặt và thực nghiệm:** môi trường, kết quả thí nghiệm, đánh giá
 - **Kết luận và hướng phát triển**
+
+---
+
+## 13. Quyết định bổ sung (16/11/2026)
+
+Sau khi trao đổi về luồng sử dụng thực tế, chốt thêm các điểm sau (làm ở Giai đoạn 3–5):
+
+**Giảm rào cản ban đầu**: chỉ người tổ chức cuộc họp bắt buộc có tài khoản.
+| Mã | Chức năng | Mô tả |
+|---|---|---|
+| F20 | Giao việc theo tên | Thêm cột `tasks.assignee_name`: AI nghe "Duy" mà chưa khớp tài khoản nào → vẫn tạo thẻ, gán tên dạng chữ |
+| F21 | Gộp tên vào tài khoản | Khi Duy đăng ký + vào nhóm → chọn gộp các thẻ tên "Duy" vào tài khoản của Duy |
+| F22 | Sao chép tin nhắn kết quả | Sau "Đẩy lên bảng": tạo sẵn tin nhắn (ai – việc – hạn + link mời) để dán vào Zalo / Messenger |
+
+**Thông báo qua email** (chỉ gửi cho người ĐÃ có tài khoản — hệ thống không tự đoán email):
+| Mã | Chức năng | Người nhận |
+|---|---|---|
+| F23 | Email "bạn được giao việc" từ cuộc họp | Người được giao (mỗi người chỉ thấy việc của mình) |
+| F24 | Thông báo **"Duy đã hoàn thành …"** khi thẻ vào cột hoàn thành | Người giao việc (chuông + email) — *khép vòng theo dõi tiến độ* |
+| F25 | **Email tổng kết cuối ngày** | Trưởng nhóm: số việc xong / đang làm / quá hạn, ai đang trễ |
+
+Gửi email qua Gmail SMTP (miễn phí). Không gửi email cho mọi thay đổi nhỏ để tránh spam.
+
+**Mở rộng (nếu còn thời gian)**: E5 — *Voice note giao việc nhanh*: bấm micro nói 1 câu → thẻ lên bảng. Dùng lại nguyên pipeline Whisper + LLM.
+
+**Câu trả lời khi hội đồng hỏi "sao không dán vào ChatGPT?"**: công cụ tóm tắt chỉ dừng ở biên bản; hệ thống biến biên bản thành công việc **có người chịu trách nhiệm, có hạn, được nhắc và theo dõi tiến độ** — đúng vấn đề "họp xong thì quên việc".

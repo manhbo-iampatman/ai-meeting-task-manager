@@ -1,0 +1,201 @@
+"""F09–F12: tạo cuộc họp, tải ghi âm / văn bản, theo dõi xử lý, xem & sửa bản ghi."""
+
+from datetime import date
+
+from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile, status
+from fastapi.responses import FileResponse
+from sqlalchemy import select
+
+from app.api.deps import DB, CurrentUser, get_membership
+from app.core.database import SessionLocal
+from app.core.security import decode_access_token
+from app.core.realtime import publish_event, workspace_room
+from app.models import Meeting, MeetingStatus, User, WorkspaceMember
+from app.schemas.meeting import MeetingDetail, MeetingOut, MeetingUpdate, TranscriptOut, TranscriptUpdate
+from app.services import meeting_service as svc
+
+router = APIRouter(tags=["meetings"])
+
+
+def _get_meeting(db: DB, meeting_id: int, user: User) -> Meeting:
+    m = db.get(Meeting, meeting_id)
+    if m is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Không tìm thấy cuộc họp")
+    get_membership(db, m.workspace_id, user)
+    return m
+
+
+def _out(m: Meeting) -> MeetingOut:
+    out = MeetingOut.model_validate(m)
+    out.duration_sec = m.transcript.duration_sec if m.transcript else None
+    return out
+
+
+def _detail(m: Meeting) -> MeetingDetail:
+    out = MeetingDetail.model_validate(m)
+    out.duration_sec = m.transcript.duration_sec if m.transcript else None
+    out.has_audio = bool(m.audio_path)
+    out.transcript = TranscriptOut.model_validate(m.transcript) if m.transcript else None
+    return out
+
+
+@router.get("/workspaces/{workspace_id}/meetings", response_model=list[MeetingOut])
+def list_meetings(workspace_id: int, user: CurrentUser, db: DB):
+    get_membership(db, workspace_id, user)
+    meetings = db.scalars(
+        select(Meeting)
+        .where(Meeting.workspace_id == workspace_id)
+        .order_by(Meeting.meeting_date.desc(), Meeting.id.desc())
+    ).all()
+    return [_out(m) for m in meetings]
+
+
+@router.post("/workspaces/{workspace_id}/meetings", response_model=MeetingDetail, status_code=status.HTTP_201_CREATED)
+def create_meeting(
+    workspace_id: int,
+    user: CurrentUser,
+    db: DB,
+    title: str = Form(min_length=1, max_length=200),
+    meeting_date: date = Form(),
+    file: UploadFile | None = File(default=None),
+    text: str | None = Form(default=None, max_length=500_000),
+    recorded: bool = Form(default=False),  # true = ghi âm trực tiếp trên trình duyệt
+):
+    """Tạo cuộc họp từ 1 trong 3 nguồn: file ghi âm, file .txt, hoặc văn bản dán vào.
+
+    - Ghi âm → lưu file, đưa vào hàng đợi, trả về NGAY (status = queued).
+    - Văn bản → tạo bản ghi luôn (status = transcribed).
+    """
+    get_membership(db, workspace_id, user)
+    has_file = file is not None and bool(file.filename)
+    has_text = bool(text and text.strip())
+    if has_file == has_text:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Hãy chọn 1 file ghi âm HOẶC dán văn bản")
+
+    ext = svc.file_ext(file.filename) if has_file else ""
+    if has_file and ext not in svc.AUDIO_EXTS | svc.TEXT_EXTS:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Định dạng không hỗ trợ. Dùng: mp3, m4a, wav, webm, ogg, aac, flac, mp4 hoặc .txt",
+        )
+
+    is_audio = has_file and ext in svc.AUDIO_EXTS
+    m = Meeting(
+        workspace_id=workspace_id,
+        title=title.strip(),
+        meeting_date=meeting_date,
+        source_type=("recording" if recorded else "audio") if is_audio else "text",
+        status=MeetingStatus.UPLOADED,
+        progress=0,
+        created_by=user.id,
+    )
+    db.add(m)
+    db.flush()  # để có m.id đặt tên file
+
+    if is_audio:
+        svc.save_audio(file, m)
+        db.commit()
+        svc.enqueue_transcription(m)
+    else:
+        if has_file:
+            raw = file.file.read(5 * 1024 * 1024 + 1)
+            if len(raw) > 5 * 1024 * 1024:
+                raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "File văn bản quá lớn (tối đa 5MB)")
+            try:
+                text = raw.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, "File .txt phải dùng mã hóa UTF-8") from None
+        svc.set_transcript_from_text(db, m, text or "")
+    db.commit()
+    db.refresh(m)
+    svc.notify_meeting(m)
+    return _detail(m)
+
+
+@router.get("/meetings/{meeting_id}", response_model=MeetingDetail)
+def get_meeting(meeting_id: int, user: CurrentUser, db: DB):
+    return _detail(_get_meeting(db, meeting_id, user))
+
+
+@router.patch("/meetings/{meeting_id}", response_model=MeetingDetail)
+def update_meeting(meeting_id: int, data: MeetingUpdate, user: CurrentUser, db: DB):
+    m = _get_meeting(db, meeting_id, user)
+    if data.title is not None:
+        m.title = data.title.strip()
+    if data.meeting_date is not None:
+        m.meeting_date = data.meeting_date
+    db.commit()
+    db.refresh(m)
+    svc.notify_meeting(m)
+    return _detail(m)
+
+
+@router.delete("/meetings/{meeting_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_meeting(meeting_id: int, user: CurrentUser, db: DB):
+    m = _get_meeting(db, meeting_id, user)
+    svc.delete_audio(m)
+    ws_id, mid = m.workspace_id, m.id
+    db.delete(m)
+    db.commit()
+    publish_event(workspace_room(ws_id), {"type": "meeting_deleted", "meeting_id": mid})
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/meetings/{meeting_id}/retry", response_model=MeetingDetail)
+def retry_meeting(meeting_id: int, user: CurrentUser, db: DB):
+    """Chạy lại chuyển giọng nói (khi lỗi, hoặc muốn chạy lại sau khi đổi mô hình)."""
+    m = _get_meeting(db, meeting_id, user)
+    if m.source_type == "text" or not m.audio_path:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Cuộc họp này không có file ghi âm")
+    if m.status in MeetingStatus.PROCESSING:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Cuộc họp đang được xử lý")
+    svc.enqueue_transcription(m)
+    db.commit()
+    db.refresh(m)
+    svc.notify_meeting(m)
+    return _detail(m)
+
+
+@router.put("/meetings/{meeting_id}/transcript", response_model=MeetingDetail)
+def update_transcript(meeting_id: int, data: TranscriptUpdate, user: CurrentUser, db: DB):
+    """F12: người dùng sửa lỗi nhận dạng (tên riêng, thuật ngữ...) trước khi đưa cho AI tóm tắt."""
+    m = _get_meeting(db, meeting_id, user)
+    if m.transcript is None or m.status in MeetingStatus.PROCESSING:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Bản ghi chưa sẵn sàng để sửa")
+    segments = [s.model_dump() for s in data.segments if s.text.strip()]
+    if not segments:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Bản ghi không được để trống")
+    for s in segments:
+        s["text"] = s["text"].strip()
+    m.transcript.segments = segments
+    m.transcript.full_text = ("\n" if m.source_type == "text" else " ").join(s["text"] for s in segments)
+    m.transcript.edited = True
+    db.commit()
+    db.refresh(m)
+    svc.notify_meeting(m)
+    return _detail(m)
+
+
+@router.get("/meetings/{meeting_id}/audio")
+def get_audio(meeting_id: int, token: str):
+    """Phát lại file ghi âm.
+
+    Thẻ <audio> của trình duyệt không gửi được header Authorization → nhận token qua
+    query string. FileResponse hỗ trợ "Range request" nên tua được tới giữa file.
+    """
+    user_id = decode_access_token(token)
+    if user_id is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Phiên đăng nhập không hợp lệ")
+    with SessionLocal() as db:
+        m = db.get(Meeting, meeting_id)
+        if m is None or db.get(WorkspaceMember, (m.workspace_id, user_id)) is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Không tìm thấy cuộc họp")
+        path = svc.audio_abspath(m)
+        if path is None or not path.exists():
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Không có file ghi âm")
+        return FileResponse(
+            path,
+            media_type=m.audio_mime or "application/octet-stream",
+            filename=m.audio_filename,
+            content_disposition_type="inline",
+        )

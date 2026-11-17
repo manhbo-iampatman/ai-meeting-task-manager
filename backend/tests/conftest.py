@@ -1,9 +1,12 @@
 """Cấu hình chung cho test: dùng CSDL riêng `meetflow_test`, làm sạch giữa các test."""
 
 import os
+import tempfile
 
 TEST_DB = "meetflow_test"
 os.environ["DATABASE_URL"] = f"postgresql+psycopg://meetflow:meetflow@localhost:5433/{TEST_DB}"
+# File upload trong lúc test ghi vào thư mục tạm, không lẫn với dữ liệu thật
+os.environ["UPLOAD_DIR"] = tempfile.mkdtemp(prefix="meetflow_test_uploads_")
 
 import psycopg  # noqa: E402
 import pytest  # noqa: E402

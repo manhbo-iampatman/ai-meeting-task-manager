@@ -13,6 +13,7 @@ import {
 } from '../api/endpoints'
 import type { Member, WorkspaceDetail } from '../api/types'
 import Avatar from '../components/Avatar'
+import MeetingsSection from '../components/meeting/MeetingsSection'
 import { Button, ErrorText, Input, Spinner } from '../components/ui'
 import { errorMessage } from '../lib/utils'
 import { useAuth } from '../stores/auth'
@@ -171,9 +172,7 @@ export default function WorkspacePage() {
             </Button>
           </form>
 
-          <div className="mt-8 rounded-xl border border-dashed border-slate-300 p-5 text-sm text-slate-500">
-            🎙️ <b>Cuộc họp</b> — tải ghi âm lên để AI tóm tắt và tạo đầu việc (Giai đoạn 3–5).
-          </div>
+          <MeetingsSection workspaceId={ws.id} />
         </section>
 
         {/* ---- Thành viên ---- */}
