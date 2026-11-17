@@ -84,10 +84,10 @@ Ký hiệu: ✅ đã làm xong · 🔜 đang / sắp làm · 💡 mở rộng n�
 | F10 | Tải file ghi âm (mp3, m4a, wav…), file .txt, dán văn bản, hoặc **ghi âm trực tiếp** | ✅ |
 | F11 | **Chuyển giọng nói → văn bản** trên GPU, thanh tiến độ realtime, tách theo từng câu, **lọc "ảo giác" của AI** | ✅ |
 | F12 | Nghe lại audio đồng bộ với bản ghi, **sửa bản ghi** | ✅ |
-| F13 | **Tóm tắt cuộc họp**: chủ đề, ý chính, quyết định, vấn đề còn mở | 🔜 Giai đoạn 4 |
-| F14 | **Trích xuất đầu việc**: Ai làm – Làm gì – Hạn chót, kèm trích dẫn câu gốc | 🔜 Giai đoạn 4 |
-| F15 | Ghép tên trong cuộc họp với tài khoản thành viên (qua biệt danh, so khớp mờ) | 🔜 Giai đoạn 4 |
-| F16 | Đổi ngày tương đối ("thứ Sáu tuần sau") thành ngày cụ thể | 🔜 Giai đoạn 4 |
+| F13 | **Tóm tắt cuộc họp**: chủ đề, ý chính, quyết định, vấn đề còn mở | ✅ |
+| F14 | **Trích xuất đầu việc**: Ai làm – Làm gì – Hạn chót, kèm trích dẫn câu gốc (**được kiểm tra lại bằng code**) | ✅ |
+| F15 | Ghép tên trong cuộc họp với tài khoản thành viên (qua biệt danh, so khớp mờ) | ✅ |
+| F16 | Đổi ngày tương đối ("thứ Sáu tuần sau") thành ngày cụ thể, tính theo ngày họp | ✅ |
 | F17 | **Màn hình duyệt** + nút **"Đẩy lên bảng"** | 🔜 Giai đoạn 5 |
 | F18 | Lịch sử cuộc họp, truy vết thẻ được tạo từ cuộc họp nào | 🔜 Giai đoạn 5 |
 | F19 | Xuất biên bản PDF / Word | 🔜 Giai đoạn 5 |
@@ -96,7 +96,7 @@ Ký hiệu: ✅ đã làm xong · 🔜 đang / sắp làm · 💡 mở rộng n�
 | Mã | Chức năng | Trạng thái |
 |---|---|---|
 | F20 | Giao việc theo **tên** khi người đó chưa có tài khoản | 🔜 |
-| F21 | Người đó đăng ký sau → **gộp** các việc mang tên họ vào tài khoản | 🔜 |
+| F21 | **Tự nhận tên**: tên AI nghe được mà chưa khớp tài khoản (kể cả biệt danh) hiện thành danh sách; người đó vào nhóm và **bấm nhận tên của mình** để nhận việc. Trưởng nhóm được báo và có thể hoàn tác | 🔜 |
 | F22 | Nút **"Sao chép tin nhắn"** kết quả cuộc họp để dán vào Zalo / Messenger | 🔜 |
 | F23 | **Email** báo việc mới (mỗi người chỉ nhận việc của mình) | 🔜 |
 | F24 | Thông báo **"Duy đã hoàn thành…"** cho người giao việc | 🔜 |
@@ -123,7 +123,7 @@ Ký hiệu: ✅ đã làm xong · 🔜 đang / sắp làm · 💡 mở rộng n�
 | Hàng đợi xử lý nền | Redis + RQ (worker AI chạy riêng, xử lý lần lượt) |
 | Realtime | WebSocket + Redis Pub/Sub |
 | Nhận dạng giọng nói | **faster-whisper** (`large-v3-turbo`, lượng tử hóa int8), chạy trên GPU của máy |
-| Tóm tắt & trích xuất | **Gemini API** (chính), Qwen qua Ollama (chạy trên máy, để so sánh) |
+| Tóm tắt & trích xuất | **Gemini API** (`gemini-3.5-flash`, tự chuyển sang `gemini-3.5-flash-lite` khi quá tải), Qwen qua Ollama (chạy trên máy, để so sánh — đã viết code, chưa chạy với mô hình thật) |
 | Hạ tầng | Docker (PostgreSQL + Redis) |
 
 ## 7. Kết quả đạt được tới hiện tại (đo thật trên laptop RTX 3050 4GB)
@@ -134,7 +134,9 @@ Ký hiệu: ✅ đã làm xong · 🔜 đang / sắp làm · 💡 mở rộng n�
 | Độ chính xác (WER, tiếng Việt) | **2,09%** lỗi từ (đúng 234/239 từ) |
 | Nhận đúng tên thành viên | "Nam" trước bị nghe thành "NOM" → nhờ gợi ý tên thành viên, giờ nghe đúng |
 | Chống AI bịa chữ | Chặn được các câu ảo giác kiểu *"Hãy subscribe cho kênh…"*; file nhạc / không có lời nói được báo lỗi rõ ràng |
-| Kiểm thử tự động | 29 test |
+| Trích xuất đầu việc (cuộc họp mẫu, Gemini) | **4/4 đầu việc**, đúng hạn chót 4/4, câu gốc tìm thấy 4/4; 1 việc người nói tự nhận được cố ý để trống người làm |
+| Thời gian tóm tắt | Khoảng **11–19 giây** cho cuộc họp 85 giây |
+| Kiểm thử tự động | 129 test |
 
 ## 8. Điểm nhấn khi bảo vệ
 

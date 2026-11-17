@@ -326,7 +326,7 @@ Sau khi trao đổi về luồng sử dụng thực tế, chốt thêm các đi�
 | Mã | Chức năng | Mô tả |
 |---|---|---|
 | F20 | Giao việc theo tên | Thêm cột `tasks.assignee_name`: AI nghe "Duy" mà chưa khớp tài khoản nào → vẫn tạo thẻ, gán tên dạng chữ |
-| F21 | Gộp tên vào tài khoản | Khi Duy đăng ký + vào nhóm → chọn gộp các thẻ tên "Duy" vào tài khoản của Duy |
+| F21 | Gộp tên vào tài khoản | ~~Khi Duy đăng ký + vào nhóm → chọn gộp các thẻ tên "Duy" vào tài khoản của Duy~~ → **đổi thành "tự nhận tên"**, xem mục 15 |
 | F22 | Sao chép tin nhắn kết quả | Sau "Đẩy lên bảng": tạo sẵn tin nhắn (ai – việc – hạn + link mời) để dán vào Zalo / Messenger |
 
 **Thông báo qua email** (chỉ gửi cho người ĐÃ có tài khoản — hệ thống không tự đoán email):
@@ -341,3 +341,41 @@ Gửi email qua Gmail SMTP (miễn phí). Không gửi email cho mọi thay đ�
 **Mở rộng (nếu còn thời gian)**: E5 — *Voice note giao việc nhanh*: bấm micro nói 1 câu → thẻ lên bảng. Dùng lại nguyên pipeline Whisper + LLM.
 
 **Câu trả lời khi hội đồng hỏi "sao không dán vào ChatGPT?"**: công cụ tóm tắt chỉ dừng ở biên bản; hệ thống biến biên bản thành công việc **có người chịu trách nhiệm, có hạn, được nhắc và theo dõi tiến độ** — đúng vấn đề "họp xong thì quên việc".
+
+---
+
+## 14. Quyết định bổ sung cho Giai đoạn 4 (17/11/2026)
+
+| Tình huống | Quyết định |
+|---|---|
+| Người nói **tự nhận việc** ("để em làm", "phần này anh lo") mà bản ghi không cho biết ai nói | **Để trống người làm**, giữ đại từ gốc, đánh dấu "người nói tự nhận"; người dùng chọn ở màn hình duyệt (GĐ5). Không mặc định gán cho người tạo cuộc họp |
+| **Một việc giao nhiều người** ("Lan và Minh làm slide") | **Tách mỗi người một đầu việc** |
+| **Hạn chót mơ hồ** | Ước lượng theo quy ước cố định và gắn cờ "ước lượng": cuối tuần = **Chủ nhật**, đầu tuần = thứ Hai, cuối tháng = ngày cuối tháng |
+| **Ollama** (máy chưa cài) | Viết provider + test giả lập ở GĐ4; chạy thật và so sánh với Gemini ở GĐ6 |
+| **Gemini quá tải** (503/504, chờ 3–4 phút rồi lỗi) | Mô hình chính `gemini-3.5-flash`, **tự chuyển sang `gemini-3.5-flash-lite`** khi gặp 429/503/504/hết giờ. Thời gian chờ mỗi lần gọi giảm từ 180 xuống **60 giây** |
+| Đã chuyển sang dự phòng mà bản ghi còn nhiều đoạn | Dùng luôn mô hình dự phòng cho các đoạn còn lại; lần tóm tắt sau lại thử mô hình chính trước |
+| Báo cho người dùng khi dùng mô hình dự phòng | Có: gợi ý sau 20 giây chờ, thông báo lúc chuyển, nhãn "mô hình dự phòng" trên biên bản |
+
+Chi tiết và lý do: `docs/GIAI_THICH_GIAI_DOAN_4.md`.
+
+---
+
+## 15. F21 đổi thành "tự nhận tên" (17/11/2026)
+
+**Vấn đề:** trong họp người ta hay gọi nhau bằng biệt danh, tên thân mật, tên giả ("Su", "anh Hai"...). Tên đăng ký tài khoản là "Trần Thị Lan" thì máy không có cách nào biết "Su" là Lan, nên kế hoạch cũ "khi người đó đăng ký thì gộp theo tên" sẽ hỏng.
+
+**Ý tưởng (do người làm khóa luận đề xuất):** những tên AI nghe được mà chưa khớp tài khoản nào được hiện thành danh sách **"tên chưa có người nhận"**. Người vào nhóm (qua link mời) thấy danh sách đó, **bấm vào tên của mình** để nhận các việc mang tên ấy, rồi nhận thông báo về việc của mình.
+
+| Điểm | Quyết định |
+|---|---|
+| Hướng làm F21 | **Người dùng tự nhận tên của mình**, thay cho việc hệ thống tự gộp theo tên |
+| Bấm nhận tên | **Có hiệu lực ngay**; trưởng nhóm nhận thông báo và có thể **hoàn tác** nếu nhận nhầm / nhận bậy |
+| Làm trong giai đoạn nào | *Chờ chốt* — đề xuất: làm F20 + tự nhận tên **ngay trong GĐ5**, cùng màn hình duyệt |
+
+**Đề xuất đi kèm (chốt khi bắt đầu làm):**
+- Nhận theo **tên** chứ không theo từng việc: nhận "Su" = nhận mọi việc mang tên "Su". Một người nhận được nhiều tên.
+- Tên vừa nhận được **lưu thành biệt danh** của người đó trong nhóm → các cuộc họp sau AI tự ghép đúng (hệ thống "học" qua biệt danh).
+- **Mọi thành viên** đều xem được danh sách, không chỉ người mới vào (thành viên cũ cũng có thể bị gọi bằng biệt danh lạ).
+- Việc mà người nói tự nhận bằng đại từ ("để em làm") **không** đưa vào danh sách nhận tên; trưởng nhóm chọn người ở màn hình duyệt.
+- Trưởng nhóm vẫn có thể **gán thẳng** tên cho một thành viên lúc duyệt.
+- Hệ thống có thể **gợi ý** "Bạn có phải là Lan trong cuộc họp 17/11?" khi tên tài khoản gần giống, nhưng **không bao giờ tự nhận thay**.

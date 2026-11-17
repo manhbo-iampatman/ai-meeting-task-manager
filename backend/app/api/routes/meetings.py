@@ -1,4 +1,4 @@
-"""F09–F12: tạo cuộc họp, tải ghi âm / văn bản, theo dõi xử lý, xem & sửa bản ghi."""
+"""F09–F16: tạo cuộc họp, tải ghi âm / văn bản, theo dõi xử lý, xem & sửa bản ghi, tóm tắt bằng AI."""
 
 from datetime import date
 
@@ -11,7 +11,15 @@ from app.core.database import SessionLocal
 from app.core.security import decode_access_token
 from app.core.realtime import publish_event, workspace_room
 from app.models import Meeting, MeetingStatus, User, WorkspaceMember
-from app.schemas.meeting import MeetingDetail, MeetingOut, MeetingUpdate, TranscriptOut, TranscriptUpdate
+from app.schemas.meeting import (
+    ExtractedTaskOut,
+    MeetingDetail,
+    MeetingOut,
+    MeetingUpdate,
+    SummaryOut,
+    TranscriptOut,
+    TranscriptUpdate,
+)
 from app.services import meeting_service as svc
 
 router = APIRouter(tags=["meetings"])
@@ -31,12 +39,34 @@ def _out(m: Meeting) -> MeetingOut:
     return out
 
 
+def _summary_out(m: Meeting) -> SummaryOut | None:
+    sm = m.summary
+    if sm is None:
+        return None
+    data = sm.summary or {}
+    return SummaryOut(
+        topic=data.get("topic") or "",
+        key_points=data.get("key_points") or [],
+        decisions=data.get("decisions") or [],
+        open_issues=data.get("open_issues") or [],
+        llm_model=sm.llm_model,
+        fallback_from=sm.fallback_from,
+        chunk_count=sm.chunk_count,
+        processing_sec=sm.processing_sec,
+        created_at=sm.created_at,
+        # Bản ghi bị sửa sau lần tóm tắt gần nhất → biên bản có thể đã cũ
+        stale=bool(m.transcript and m.transcript.updated_at > sm.created_at),
+    )
+
+
 def _detail(m: Meeting) -> MeetingDetail:
-    out = MeetingDetail.model_validate(m)
-    out.duration_sec = m.transcript.duration_sec if m.transcript else None
-    out.has_audio = bool(m.audio_path)
-    out.transcript = TranscriptOut.model_validate(m.transcript) if m.transcript else None
-    return out
+    return MeetingDetail(
+        **_out(m).model_dump(),
+        has_audio=bool(m.audio_path),
+        transcript=TranscriptOut.model_validate(m.transcript) if m.transcript else None,
+        summary=_summary_out(m),
+        extracted_tasks=[ExtractedTaskOut.model_validate(t) for t in m.extracted_tasks],
+    )
 
 
 @router.get("/workspaces/{workspace_id}/meetings", response_model=list[MeetingOut])
@@ -149,6 +179,7 @@ def retry_meeting(meeting_id: int, user: CurrentUser, db: DB):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Cuộc họp này không có file ghi âm")
     if m.status in MeetingStatus.PROCESSING:
         raise HTTPException(status.HTTP_409_CONFLICT, "Cuộc họp đang được xử lý")
+    svc.clear_ai_results(db, m)  # bản ghi sắp được thay mới → biên bản cũ không còn đúng
     svc.enqueue_transcription(m)
     db.commit()
     db.refresh(m)
@@ -170,6 +201,25 @@ def update_transcript(meeting_id: int, data: TranscriptUpdate, user: CurrentUser
     m.transcript.segments = segments
     m.transcript.full_text = ("\n" if m.source_type == "text" else " ").join(s["text"] for s in segments)
     m.transcript.edited = True
+    db.commit()
+    db.refresh(m)
+    svc.notify_meeting(m)
+    return _detail(m)
+
+
+@router.post("/meetings/{meeting_id}/summarize", response_model=MeetingDetail)
+def summarize_meeting(meeting_id: int, user: CurrentUser, db: DB):
+    """F13–F16: nhờ AI tóm tắt cuộc họp và tách đầu việc (Ai làm – Làm gì – Hạn chót).
+
+    Chỉ đưa việc vào hàng đợi rồi trả về NGAY (status = summarizing); worker gọi LLM ở
+    tiến trình riêng. Gọi lại lần nữa = tóm tắt lại, kết quả cũ bị thay thế.
+    """
+    m = _get_meeting(db, meeting_id, user)
+    if m.status in MeetingStatus.PROCESSING:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Cuộc họp đang được xử lý")
+    if m.transcript is None or not m.transcript.segments:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Cuộc họp chưa có bản ghi để tóm tắt")
+    svc.enqueue_summarization(m)
     db.commit()
     db.refresh(m)
     svc.notify_meeting(m)

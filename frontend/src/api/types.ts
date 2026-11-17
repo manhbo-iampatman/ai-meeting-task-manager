@@ -108,7 +108,7 @@ export type Notification = {
 export type NotificationList = { unread_count: number; items: Notification[] }
 
 // ---- Cuộc họp (Giai đoạn 3) ----
-export type MeetingStatus = 'uploaded' | 'queued' | 'transcribing' | 'transcribed' | 'failed'
+export type MeetingStatus = 'uploaded' | 'queued' | 'transcribing' | 'transcribed' | 'summarizing' | 'review' | 'failed'
 
 export type Segment = { start: number | null; end: number | null; text: string }
 
@@ -132,6 +132,8 @@ export type Meeting = {
   status: MeetingStatus
   progress: number
   error: string | null
+  /** Thông báo phụ trong lúc xử lý, vd. "Mô hình … quá tải, đã chuyển sang mô hình dự phòng…" */
+  status_note: string | null
   audio_filename: string | null
   audio_size: number | null
   created_by: number | null
@@ -139,4 +141,49 @@ export type Meeting = {
   duration_sec: number | null
 }
 
-export type MeetingDetail = Meeting & { has_audio: boolean; transcript: Transcript | null }
+// ---- Tóm tắt & đầu việc do AI trích xuất (Giai đoạn 4) ----
+export type MeetingSummary = {
+  topic: string
+  key_points: string[]
+  decisions: string[]
+  open_issues: string[]
+  /** Mô hình THỰC SỰ đã viết biên bản */
+  llm_model: string | null
+  /** Mô hình chính bị bỏ qua vì quá tải / hết hạn mức → biên bản do mô hình dự phòng viết. null = bình thường */
+  fallback_from: string | null
+  chunk_count: number
+  processing_sec: number | null
+  created_at: string
+  /** Bản ghi đã bị sửa sau khi tóm tắt → biên bản có thể không còn khớp */
+  stale: boolean
+}
+
+/** Kết quả ghép tên: khớp hẳn / khớp khi bỏ dấu / gần giống / trùng nhiều người / người nói tự nhận / cả nhóm / không khớp */
+export type AssigneeMatch = 'exact' | 'no_accent' | 'fuzzy' | 'ambiguous' | 'self' | 'group' | 'none'
+
+export type ExtractedTask = {
+  id: number
+  position: number
+  title: string
+  raw_assignee: string | null
+  assignee: User | null
+  assignee_match: AssigneeMatch
+  assignee_score: number
+  assignee_candidates: number[]
+  due_text: string | null
+  due_date: string | null
+  due_approximate: boolean
+  priority: Priority
+  evidence_quote: string
+  evidence_found: boolean
+  evidence_segment: number | null
+  evidence_start: number | null
+  status: 'pending' | 'accepted' | 'rejected'
+}
+
+export type MeetingDetail = Meeting & {
+  has_audio: boolean
+  transcript: Transcript | null
+  summary: MeetingSummary | null
+  extracted_tasks: ExtractedTask[]
+}

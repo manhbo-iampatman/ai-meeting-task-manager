@@ -15,7 +15,7 @@ rq>=2.0
 
 # --- Test ---
 pytest>=8.3
-httpx>=0.28
+httpx>=0.28                   # TestClient; cũng dùng để gọi Ollama (LLM chạy trên máy)
 
 # --- Bảo mật / xác thực ---
 pyjwt>=2.10                   # tạo và kiểm tra JWT

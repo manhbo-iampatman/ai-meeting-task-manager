@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.realtime import publish_event, workspace_room
-from app.models import Meeting, MeetingStatus, Transcript
+from app.models import ExtractedTask, Meeting, MeetingStatus, MeetingSummary, Transcript
 
 log = logging.getLogger(__name__)
 
@@ -129,6 +129,7 @@ def notify_meeting(meeting: Meeting) -> None:
             "meeting_id": meeting.id,
             "status": meeting.status,
             "progress": meeting.progress,
+            "status_note": meeting.status_note,
         },
     )
 
@@ -152,7 +153,42 @@ def enqueue_transcription(meeting: Meeting) -> None:
         meeting.status = MeetingStatus.QUEUED
         meeting.progress = 0
         meeting.error = None
+        meeting.status_note = None
     except Exception as e:  # noqa: BLE001 — Redis chưa chạy
         log.error("Không đưa được vào hàng đợi: %s", e)
         meeting.status = MeetingStatus.FAILED
         meeting.error = "Không kết nối được hàng đợi (Redis). Hãy bật Docker rồi bấm Thử lại."
+
+
+def enqueue_summarization(meeting: Meeting) -> None:
+    """Đưa cuộc họp vào hàng đợi để worker gọi LLM tóm tắt + trích xuất đầu việc (Giai đoạn 4).
+
+    Dùng chung hàng đợi với bước chuyển giọng nói → worker vẫn xử lý lần lượt từng việc.
+    """
+    from app.core.queue import meeting_queue
+
+    try:
+        job = meeting_queue.enqueue(
+            "app.workers.jobs.summarize_meeting_job",
+            meeting.id,
+            job_timeout=30 * 60,
+            result_ttl=24 * 60 * 60,
+            failure_ttl=7 * 24 * 60 * 60,
+        )
+    except Exception as e:  # noqa: BLE001 — Redis chưa chạy
+        log.error("Không đưa được vào hàng đợi: %s", e)
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "Không kết nối được hàng đợi (Redis). Hãy bật Docker rồi thử lại."
+        ) from e
+    meeting.job_id = job.id
+    meeting.status = MeetingStatus.SUMMARIZING
+    meeting.progress = 0
+    meeting.error = None
+    meeting.status_note = None
+
+
+def clear_ai_results(db: Session, meeting: Meeting) -> None:
+    """Xóa biên bản + đầu việc nháp (khi nhận dạng lại giọng nói → bản ghi cũ không còn đúng)."""
+    db.query(ExtractedTask).filter(ExtractedTask.meeting_id == meeting.id).delete()
+    db.query(MeetingSummary).filter(MeetingSummary.meeting_id == meeting.id).delete()
+    db.expire(meeting, ["summary", "extracted_tasks"])

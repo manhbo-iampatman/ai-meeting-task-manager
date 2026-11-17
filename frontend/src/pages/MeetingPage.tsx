@@ -6,42 +6,53 @@ import {
   getMeeting,
   meetingAudioUrl,
   retryMeeting,
+  summarizeMeeting,
   updateMeeting,
   updateTranscript,
 } from '../api/endpoints'
 import type { MeetingDetail, Segment } from '../api/types'
+import ExtractedTasksView from '../components/meeting/ExtractedTasksView'
 import MeetingStatusBadge from '../components/meeting/MeetingStatusBadge'
+import SummaryView from '../components/meeting/SummaryView'
 import TranscriptView from '../components/meeting/TranscriptView'
 import { Button, ErrorText, Spinner } from '../components/ui'
 import { useWorkspaceSocket } from '../hooks/useWorkspaceSocket'
 import { errorMessage, formatBytes, formatClock, formatDate, formatDateTime } from '../lib/utils'
 import { useAuth } from '../stores/auth'
 
-const PROCESSING = new Set(['queued', 'transcribing'])
+const PROCESSING = new Set(['queued', 'transcribing', 'summarizing'])
 
 /** Các bước xử lý — hiển thị dạng "đường đi" để người dùng biết hệ thống đang ở đâu. */
 function Pipeline({ m }: { m: MeetingDetail }) {
   const [waitedLong, setWaitedLong] = useState(false)
   useEffect(() => {
     setWaitedLong(false)
-    if (m.status !== 'queued') return
-    const t = setTimeout(() => setWaitedLong(true), 15000)
+    // Đứng ở hàng đợi quá 15 giây → có thể worker chưa chạy.
+    // AI tóm tắt quá 20 giây (bình thường 3–20 giây) → có thể Gemini đang quá tải.
+    const ms = m.status === 'queued' ? 15000 : m.status === 'summarizing' ? 20000 : 0
+    if (!ms) return
+    const t = setTimeout(() => setWaitedLong(true), ms)
     return () => clearTimeout(t)
   }, [m.status])
 
+  const hasTranscript = m.status === 'transcribed' || m.status === 'summarizing' || m.status === 'review'
   const steps = [
-    { key: 'upload', label: 'Tải file lên', state: 'done' },
+    { key: 'upload', label: m.source_type === 'text' ? 'Nhận văn bản' : 'Tải file lên', state: 'done' },
     {
       key: 'queue',
       label: 'Chờ trong hàng đợi',
-      state: m.status === 'queued' ? 'active' : m.status === 'transcribing' || m.status === 'transcribed' ? 'done' : 'idle',
+      state: m.status === 'queued' ? 'active' : m.status === 'transcribing' || hasTranscript ? 'done' : 'idle',
     },
     {
       key: 'stt',
-      label: 'Chuyển giọng nói → văn bản (Whisper)',
-      state: m.status === 'transcribing' ? 'active' : m.status === 'transcribed' ? 'done' : m.status === 'failed' ? 'error' : 'idle',
+      label: m.source_type === 'text' ? 'Bản ghi (văn bản có sẵn)' : 'Chuyển giọng nói → văn bản (Whisper)',
+      state: m.status === 'transcribing' ? 'active' : hasTranscript ? 'done' : m.status === 'failed' ? 'error' : 'idle',
     },
-    { key: 'llm', label: 'Tóm tắt & tạo đầu việc (Giai đoạn 4)', state: 'idle' },
+    {
+      key: 'llm',
+      label: 'AI tóm tắt & tách đầu việc (LLM)',
+      state: m.status === 'summarizing' ? 'active' : m.status === 'review' ? 'done' : 'idle',
+    },
   ]
   const dot = {
     done: 'bg-emerald-500 text-white',
@@ -75,6 +86,28 @@ function Pipeline({ m }: { m: MeetingDetail }) {
           <p className="mt-2 text-xs text-slate-500">Bạn có thể rời trang này — hệ thống vẫn xử lý và tự cập nhật khi xong.</p>
         </div>
       )}
+      {m.status === 'summarizing' && (
+        <div className="mt-5">
+          <div className="mb-1 flex justify-between text-xs text-slate-600">
+            <span>AI đang đọc bản ghi để viết biên bản và tách đầu việc…</span>
+            <span>{m.progress}%</span>
+          </div>
+          <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-full animate-pulse rounded-full bg-violet-500 transition-all duration-700" style={{ width: `${Math.max(8, m.progress)}%` }} />
+          </div>
+          <p className="mt-2 text-xs text-slate-500">Thường mất 10–30 giây. Bạn có thể rời trang này — hệ thống tự cập nhật khi xong.</p>
+          {m.status_note ? (
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{m.status_note}</p>
+          ) : (
+            waitedLong && (
+              <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Gemini đang trả lời chậm hơn bình thường (có thể đang quá tải). Nếu quá thời gian chờ, hệ thống sẽ tự
+                chuyển sang mô hình dự phòng.
+              </p>
+            )
+          )}
+        </div>
+      )}
       {m.status === 'queued' && waitedLong && (
         <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
           Đứng chờ hơi lâu? Có thể <b>worker AI chưa chạy</b>. Mở terminal trong thư mục <code>backend</code> và chạy{' '}
@@ -105,6 +138,7 @@ export default function MeetingPage() {
     qc.invalidateQueries({ queryKey: ['meetings', d.workspace_id] })
   }
   const retry = useMutation({ mutationFn: () => retryMeeting(id), onSuccess: setData })
+  const summarize = useMutation({ mutationFn: () => summarizeMeeting(id), onSuccess: setData })
   const rename = useMutation({ mutationFn: (title: string) => updateMeeting(id, { title }), onSuccess: setData })
   const save = useMutation({ mutationFn: (segs: Segment[]) => updateTranscript(id, segs), onSuccess: setData })
   const remove = useMutation({
@@ -120,6 +154,10 @@ export default function MeetingPage() {
 
   const tr = m.transcript
   const processing = PROCESSING.has(m.status)
+  // Đang chuyển giọng nói thì chưa có bản ghi để hiện; đang tóm tắt thì vẫn hiện (chỉ khóa nút sửa)
+  const transcribing = m.status === 'queued' || m.status === 'transcribing'
+  // Lỗi ở bước tóm tắt: bản ghi vẫn còn, trạng thái quay về "đã có bản ghi" / "chờ duyệt" kèm thông báo lỗi
+  const summarizeError = m.status !== 'failed' && !processing ? m.error : null
   const speed = tr?.duration_sec && tr?.processing_sec ? tr.duration_sec / tr.processing_sec : null
 
   const copyText = async () => {
@@ -180,11 +218,28 @@ export default function MeetingPage() {
 
           {(processing || (m.status === 'failed' && !tr)) && <Pipeline m={m} />}
 
-          {tr && !processing && (
+          {summarizeError && (
+            <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-medium text-amber-800">AI chưa tóm tắt được cuộc họp</p>
+              <p className="break-words text-sm text-amber-800">{summarizeError}</p>
+              <p className="text-xs text-amber-700">
+                Bản ghi vẫn còn nguyên{m.summary ? ', kết quả tóm tắt lần trước vẫn được giữ' : ''}. Bấm nút tóm tắt ở cột bên phải để thử lại.
+              </p>
+            </div>
+          )}
+
+          {m.summary && !transcribing && (
+            <>
+              <SummaryView summary={m.summary} />
+              <ExtractedTasksView tasks={m.extracted_tasks} audioRef={audioRef} hasAudio={m.has_audio} />
+            </>
+          )}
+
+          {tr && !transcribing && (
             <TranscriptView
               segments={tr.segments}
               audioRef={audioRef}
-              editable
+              editable={!processing}
               saving={save.isPending}
               onSave={(segs) => save.mutateAsync(segs)}
             />
@@ -247,15 +302,37 @@ export default function MeetingPage() {
             )}
           </div>
 
-          <div className="rounded-xl border border-dashed border-indigo-200 bg-indigo-50/50 p-4 text-sm">
-            <h3 className="font-semibold text-indigo-800">Bước tiếp theo</h3>
-            <p className="mt-1 text-indigo-900/70">
-              AI tóm tắt cuộc họp và tách danh sách <b>Ai làm – Làm gì – Hạn chót</b>.
-            </p>
-            <Button className="mt-3 w-full" disabled>
-              ✨ Tóm tắt & tạo đầu việc (Giai đoạn 4)
-            </Button>
-          </div>
+          {tr && !transcribing && (
+            <div className="rounded-xl border border-dashed border-indigo-200 bg-indigo-50/50 p-4 text-sm">
+              <h3 className="font-semibold text-indigo-800">{m.summary ? 'Tóm tắt bằng AI' : 'Bước tiếp theo'}</h3>
+              <p className="mt-1 text-indigo-900/70">
+                {m.summary ? (
+                  <>
+                    Đã có biên bản và <b>{m.extracted_tasks.length} đầu việc nháp</b>. Sửa bản ghi rồi tóm tắt lại nếu thấy AI hiểu sai.
+                  </>
+                ) : (
+                  <>
+                    Kiểm tra bản ghi (nhất là <b>tên người</b> và <b>ngày tháng</b>), rồi để AI tóm tắt và tách danh sách{' '}
+                    <b>Ai làm – Làm gì – Hạn chót</b>.
+                  </>
+                )}
+              </p>
+              <Button
+                className="mt-3 w-full"
+                variant={m.summary ? 'secondary' : 'primary'}
+                disabled={processing || summarize.isPending}
+                onClick={() => {
+                  if (m.summary && !confirm('Tóm tắt lại? Biên bản và các đầu việc nháp hiện tại sẽ được thay bằng kết quả mới.')) return
+                  summarize.mutate()
+                }}
+              >
+                {m.status === 'summarizing' ? 'AI đang tóm tắt…' : m.summary ? '↻ Tóm tắt lại' : '✨ Tóm tắt & tạo đầu việc'}
+              </Button>
+              <div className="mt-2">
+                <ErrorText>{summarize.error && errorMessage(summarize.error)}</ErrorText>
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col items-start gap-1">
             <button

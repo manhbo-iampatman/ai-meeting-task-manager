@@ -7,24 +7,31 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 from app.models.mixins import TimestampMixin
+from app.models.user import User
 
 
 class MeetingStatus:
     """Vòng đời của một cuộc họp trong hệ thống.
 
-    uploaded ──► queued ──► transcribing ──► transcribed ──► (GĐ4) summarizing ──► review ──► done
-                                   │
+    uploaded ──► queued ──► transcribing ──► transcribed ──► summarizing ──► review ──► (GĐ5) done
+                                   │                 ▲            │
+                                   │                 └── lỗi LLM ─┘  (bản ghi vẫn còn, bấm tóm tắt lại)
                                    └──► failed (lỗi: file hỏng, hết bộ nhớ GPU...) → có thể "Thử lại"
     Nếu người dùng dán sẵn văn bản thì đi thẳng tới `transcribed`.
+
+    - summarizing: LLM đang đọc bản ghi để tóm tắt và tách đầu việc (Giai đoạn 4).
+    - review: đã có biên bản + đầu việc NHÁP, chờ người dùng duyệt (Giai đoạn 5).
     """
 
     UPLOADED = "uploaded"
     QUEUED = "queued"
     TRANSCRIBING = "transcribing"
     TRANSCRIBED = "transcribed"
+    SUMMARIZING = "summarizing"
+    REVIEW = "review"
     FAILED = "failed"
 
-    PROCESSING = {QUEUED, TRANSCRIBING}
+    PROCESSING = {QUEUED, TRANSCRIBING, SUMMARIZING}
 
 
 class Meeting(TimestampMixin, Base):
@@ -45,6 +52,8 @@ class Meeting(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(20), default=MeetingStatus.UPLOADED, index=True)
     progress: Mapped[int] = mapped_column(Integer, default=0)  # 0–100 (%)
     error: Mapped[str | None] = mapped_column(Text)
+    # Thông báo phụ trong lúc xử lý, vd. "Mô hình chính quá tải, đã chuyển sang mô hình dự phòng…"
+    status_note: Mapped[str | None] = mapped_column(Text)
     job_id: Mapped[str | None] = mapped_column(String(64))
 
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
@@ -52,6 +61,12 @@ class Meeting(TimestampMixin, Base):
 
     transcript: Mapped["Transcript | None"] = relationship(
         back_populates="meeting", uselist=False, cascade="all, delete-orphan", passive_deletes=True
+    )
+    summary: Mapped["MeetingSummary | None"] = relationship(
+        back_populates="meeting", uselist=False, cascade="all, delete-orphan", passive_deletes=True
+    )
+    extracted_tasks: Mapped[list["ExtractedTask"]] = relationship(
+        back_populates="meeting", order_by="ExtractedTask.position", cascade="all, delete-orphan", passive_deletes=True
     )
 
 
@@ -75,3 +90,74 @@ class Transcript(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     meeting: Mapped[Meeting] = relationship(back_populates="transcript")
+
+
+class MeetingSummary(Base):
+    """Biên bản do LLM viết (F13). Quan hệ 1–1 với cuộc họp; tóm tắt lại thì ghi đè."""
+
+    __tablename__ = "meeting_summaries"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    meeting_id: Mapped[int] = mapped_column(ForeignKey("meetings.id", ondelete="CASCADE"), unique=True)
+    # {"topic": "...", "key_points": [...], "decisions": [...], "open_issues": [...]}
+    summary: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    llm_model: Mapped[str | None] = mapped_column(String(100))  # mô hình THỰC SỰ đã viết, vd. "gemini/gemini-3.5-flash"
+    # Mô hình chính bị bỏ qua vì quá tải / hết hạn mức → biên bản do mô hình dự phòng viết.
+    # None = mô hình chính viết bình thường.
+    fallback_from: Mapped[str | None] = mapped_column(String(100))
+    chunk_count: Mapped[int] = mapped_column(Integer, default=1)  # bản ghi bị chia mấy đoạn
+    processing_sec: Mapped[float | None] = mapped_column(Float)
+    input_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_tokens: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    meeting: Mapped[Meeting] = relationship(back_populates="summary")
+
+
+class ExtractedTaskStatus:
+    PENDING = "pending"  # nháp, chờ duyệt
+    ACCEPTED = "accepted"  # đã đẩy lên bảng (Giai đoạn 5)
+    REJECTED = "rejected"  # người dùng bỏ
+
+
+class ExtractedTask(Base):
+    """Đầu việc NHÁP do AI trích từ cuộc họp (F14–F16).
+
+    Tách riêng khỏi bảng `tasks`: kết quả AI chỉ là đề xuất, chỉ thành công việc thật
+    trên bảng Kanban khi người dùng duyệt (human-in-the-loop, Giai đoạn 5).
+    """
+
+    __tablename__ = "extracted_tasks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    meeting_id: Mapped[int] = mapped_column(ForeignKey("meetings.id", ondelete="CASCADE"), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)  # thứ tự xuất hiện trong cuộc họp
+    title: Mapped[str] = mapped_column(String(255))
+
+    # --- Người làm (F15) ---
+    raw_assignee: Mapped[str | None] = mapped_column(String(100))  # chữ AI nghe được: "Nam", "anh", "Duy"
+    assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # Kết quả ghép tên: exact | no_accent | fuzzy | ambiguous | self | group | none
+    assignee_match: Mapped[str] = mapped_column(String(20), default="none")
+    assignee_score: Mapped[int] = mapped_column(Integer, default=0)
+    # Khi ambiguous (2 thành viên trùng tên): id các tài khoản có thể đúng, để gợi ý lúc duyệt
+    assignee_candidates: Mapped[list[int]] = mapped_column(JSONB, default=list)
+
+    # --- Hạn chót (F16) ---
+    due_text: Mapped[str | None] = mapped_column(String(200))  # nguyên văn: "thứ Sáu tuần này"
+    due_date: Mapped[date | None] = mapped_column(Date)  # ngày đã tính theo ngày họp
+    due_approximate: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
+    priority: Mapped[str] = mapped_column(String(10), default="medium")
+
+    # --- Bằng chứng: câu gốc trong bản ghi ---
+    evidence_quote: Mapped[str] = mapped_column(Text, default="")
+    evidence_found: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    evidence_segment: Mapped[int | None] = mapped_column(Integer)
+    evidence_start: Mapped[float | None] = mapped_column(Float)  # giây, để nghe lại đúng câu
+
+    status: Mapped[str] = mapped_column(String(10), default=ExtractedTaskStatus.PENDING)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    meeting: Mapped[Meeting] = relationship(back_populates="extracted_tasks")
+    assignee: Mapped[User | None] = relationship(lazy="joined")

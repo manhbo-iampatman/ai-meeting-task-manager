@@ -109,6 +109,8 @@ export const updateMeeting = (id: number, body: { title?: string; meeting_date?:
   data(api.patch<MeetingDetail>(`/meetings/${id}`, body))
 export const deleteMeeting = (id: number) => api.delete(`/meetings/${id}`)
 export const retryMeeting = (id: number) => data(api.post<MeetingDetail>(`/meetings/${id}/retry`))
+/** Nhờ AI tóm tắt + tách đầu việc. Trả về ngay (status = summarizing), worker xử lý nền. */
+export const summarizeMeeting = (id: number) => data(api.post<MeetingDetail>(`/meetings/${id}/summarize`))
 export const updateTranscript = (id: number, segments: Segment[]) =>
   data(api.put<MeetingDetail>(`/meetings/${id}/transcript`, { segments }))
 /** Thẻ <audio> không gửi được header → đưa token vào URL. */
