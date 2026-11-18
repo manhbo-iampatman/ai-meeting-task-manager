@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ArrowLeft, Check, Hourglass, RotateCw, Sparkles } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -15,6 +16,7 @@ import {
 import type { MeetingDetail, Segment } from '../api/types'
 import ExtractedTasksView from '../components/meeting/ExtractedTasksView'
 import MeetingStatusBadge from '../components/meeting/MeetingStatusBadge'
+import { SourceLabel } from '../components/meeting/SourceIcon'
 import SummaryView from '../components/meeting/SummaryView'
 import TranscriptView from '../components/meeting/TranscriptView'
 import { Button, ErrorText, Spinner } from '../components/ui'
@@ -68,18 +70,18 @@ function Pipeline({ m }: { m: MeetingDetail }) {
   ]
   const dot = {
     done: 'bg-emerald-500 text-white',
-    active: 'bg-indigo-500 text-white animate-pulse',
+    active: 'bg-brand-500 text-white animate-pulse',
     error: 'bg-rose-500 text-white',
     idle: 'bg-slate-200 text-slate-500',
   } as const
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
+    <div className="glass rounded-2xl border p-5">
       <ol className="space-y-3">
         {steps.map((s, i) => (
           <li key={s.key} className="flex items-center gap-3">
             <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${dot[s.state as keyof typeof dot]}`}>
-              {s.state === 'done' ? '✓' : s.state === 'error' ? '!' : i + 1}
+              {s.state === 'done' ? <Check className="size-3.5" aria-hidden="true" /> : s.state === 'error' ? '!' : i + 1}
             </span>
             <span className={`text-sm ${s.state === 'idle' ? 'text-slate-400' : 'text-slate-700'}`}>{s.label}</span>
           </li>
@@ -93,7 +95,7 @@ function Pipeline({ m }: { m: MeetingDetail }) {
             <span>{m.progress}%</span>
           </div>
           <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-            <div className="h-full rounded-full bg-indigo-500 transition-all duration-700" style={{ width: `${Math.max(3, m.progress)}%` }} />
+            <div className="h-full rounded-full bg-brand-500 transition-all duration-700" style={{ width: `${Math.max(3, m.progress)}%` }} />
           </div>
           <p className="mt-2 text-xs text-slate-500">Bạn có thể rời trang này — hệ thống vẫn xử lý và tự cập nhật khi xong.</p>
         </div>
@@ -204,11 +206,12 @@ export default function MeetingPage() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8">
       <Link to={`/workspaces/${m.workspace_id}`} className="text-sm text-slate-500 hover:underline">
-        ← Về trang nhóm
+        <ArrowLeft className="mr-1 inline size-4 align-[-3px]" aria-hidden="true" />
+        Về trang nhóm
       </Link>
 
       <div className="mt-2 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold">{m.title}</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{m.title}</h1>
         <MeetingStatusBadge status={m.status} progress={m.progress} />
         <span
           className={`flex items-center gap-1 text-xs ${live ? 'text-emerald-600' : 'text-slate-400'}`}
@@ -225,7 +228,7 @@ export default function MeetingPage() {
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="min-w-0 space-y-4">
           {m.has_audio && (
-            <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="glass rounded-2xl border p-3">
               <audio ref={audioRef} controls preload="metadata" src={meetingAudioUrl(m.id, token)} className="w-full" />
             </div>
           )}
@@ -236,7 +239,7 @@ export default function MeetingPage() {
               <p className="break-words text-sm text-rose-700">{m.error}</p>
               {m.source_type !== 'text' && (
                 <Button onClick={() => retry.mutate()} disabled={retry.isPending}>
-                  ↻ Thử lại
+                  <RotateCw aria-hidden="true" /> Thử lại
                 </Button>
               )}
               <ErrorText>{retry.error && errorMessage(retry.error)}</ErrorText>
@@ -246,7 +249,9 @@ export default function MeetingPage() {
           {/* Online Meeting vừa kết thúc: chờ trình duyệt của mọi người gửi nốt ghi âm (tối đa 2 phút) */}
           {m.source_type === 'online' && m.status === 'uploaded' && (
             <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-800">
-              <p className="font-medium">⏳ {m.status_note ?? 'Đang chờ ghi âm của mọi người gửi về…'}</p>
+              <p className="font-medium">
+                <Hourglass className="mr-1 inline size-4 align-[-3px]" aria-hidden="true" />
+                {m.status_note ?? 'Đang chờ ghi âm của mọi người gửi về…'}</p>
               <p className="mt-1 text-xs">
                 Mỗi người ghi âm bằng mic của mình. Đủ ghi âm của mọi người (hoặc sau tối đa 2 phút) hệ thống sẽ tự chuyển
                 thành bản ghi có tên người nói.
@@ -276,7 +281,7 @@ export default function MeetingPage() {
               {m.tracks
                 .filter((t) => t.pending)
                 .map((t) => (
-                  <div key={t.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">
+                  <div key={t.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900">
                     <p className="min-w-0 flex-1">
                       <b>Ghi âm đến muộn của {t.speaker_name} đã về.</b> Bản ghi đã được sửa tay hoặc đã tóm tắt nên hệ thống
                       không tự thêm vào.
@@ -336,13 +341,13 @@ export default function MeetingPage() {
         </div>
 
         <aside className="space-y-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
+          <div className="glass rounded-2xl border p-4 text-sm">
             <h3 className="mb-2 font-semibold">Thông tin</h3>
             <dl className="space-y-1.5 text-slate-600">
               <div className="flex justify-between gap-2">
                 <dt>Nguồn</dt>
                 <dd className="text-right">
-                  {{ audio: '🎙️ Tải file ghi âm', recording: '🔴 Ghi trực tiếp', text: '📝 Văn bản', online: '📹 Online Meeting' }[m.source_type]}
+                  <SourceLabel type={m.source_type} />
                 </dd>
               </div>
               {m.audio_filename && (
@@ -393,9 +398,9 @@ export default function MeetingPage() {
           </div>
 
           {tr && !transcribing && (
-            <div className="rounded-xl border border-dashed border-indigo-200 bg-indigo-50/50 p-4 text-sm">
-              <h3 className="font-semibold text-indigo-800">{m.summary ? 'Tóm tắt bằng AI' : 'Bước tiếp theo'}</h3>
-              <p className="mt-1 text-indigo-900/70">
+            <div className="rounded-xl border border-dashed border-brand-200 bg-brand-50/50 p-4 text-sm">
+              <h3 className="font-semibold text-brand-800">{m.summary ? 'Tóm tắt bằng AI' : 'Bước tiếp theo'}</h3>
+              <p className="mt-1 text-brand-900/70">
                 {m.summary ? (
                   <>
                     Đã có biên bản,{' '}
@@ -428,7 +433,17 @@ export default function MeetingPage() {
                   summarize.mutate()
                 }}
               >
-                {m.status === 'summarizing' ? 'AI đang tóm tắt…' : m.summary ? '↻ Tóm tắt lại' : '✨ Tóm tắt & tạo đầu việc'}
+                {m.status === 'summarizing' ? (
+                  'AI đang tóm tắt…'
+                ) : m.summary ? (
+                  <>
+                    <RotateCw aria-hidden="true" /> Tóm tắt lại
+                  </>
+                ) : (
+                  <>
+                    <Sparkles aria-hidden="true" /> Tóm tắt & tạo đầu việc
+                  </>
+                )}
               </Button>
               <div className="mt-2">
                 <ErrorText>{summarize.error && errorMessage(summarize.error)}</ErrorText>

@@ -373,7 +373,7 @@ def test_only_assignee_creator_or_owner_can_change_a_card(client):
         client.post("/api/workspaces/join", json={"invite_code": ws["invite_code"]}, headers=auth(h))
     b = _board(client, nam, ws["boards"][0]["id"])
     assert b["owner_id"] == nam["_user"]["id"]
-    todo, done = b["columns"][0]["id"], b["columns"][2]["id"]
+    todo, done = b["columns"][0]["id"], b["columns"][-1]["id"]
 
     def can(h, t):
         """(kéo, sửa) có được không."""

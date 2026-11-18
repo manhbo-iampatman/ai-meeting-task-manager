@@ -1,10 +1,315 @@
 @import "tailwindcss";
 
-body {
-  @apply bg-slate-50 text-slate-800 antialiased;
+/* Phông Be Vietnam Pro, tự lưu trong ứng dụng (không tải từ Google) → demo trong LAN / offline vẫn đúng phông.
+   Mỗi file chứa nhiều "subset"; trình duyệt chỉ tải phần chữ thật sự dùng (latin + tiếng Việt). */
+@import "@fontsource/be-vietnam-pro/400.css";
+@import "@fontsource/be-vietnam-pro/500.css";
+@import "@fontsource/be-vietnam-pro/600.css";
+@import "@fontsource/be-vietnam-pro/700.css";
+
+/* Chế độ tối bật bằng class "dark" trên thẻ <html> (xem stores/theme.ts) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* =====================================================================================
+   HỆ THỐNG THIẾT KẾ (design tokens)
+
+   Cách làm: KHÔNG rải `dark:` khắp các component. Thay vào đó định nghĩa lại các biến màu
+   của Tailwind (--color-slate-*, --color-brand-*, …) trong `.dark`. Mọi class sẵn có như
+   `text-slate-700`, `bg-amber-50`, `border-slate-200` tự đổi theo → một nguồn sự thật
+   duy nhất, đổi giao diện không phải sửa từng file.
+   ===================================================================================== */
+@theme {
+  --font-sans: "Be Vietnam Pro", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Màu nhấn của sản phẩm (xanh dương). Component dùng `brand-*`, không dùng tên màu cụ thể. */
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+  --color-brand-950: #172554;
+
+  /* Chữ phụ: Tailwind mặc định slate-400 chỉ đạt 2,6:1 trên nền trắng (WCAG cần 4,5:1) → làm đậm hơn */
+  --color-slate-400: #62718a;
+  --color-slate-500: #536074;
+
+  /* Bề mặt */
+  --color-field: rgb(255 255 255 / 0.85); /* ô nhập */
+  --color-elevated: rgb(255 255 255 / 0.92); /* thẻ nhỏ lặp lại nhiều (thẻ Kanban) — không làm mờ nền cho nhẹ máy */
+  --color-overlay: rgb(15 23 42 / 0.45); /* lớp phủ sau hộp thoại */
+
+  /* Chuyển động: một bộ thời lượng + nhịp dùng chung cho cả ứng dụng */
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-page: mf-rise 0.35s var(--ease-soft) both;
+  --animate-pop: mf-pop 0.22s var(--ease-soft) both;
+  --animate-fade: mf-fade 0.2s ease-out both;
+  --animate-shimmer: mf-shimmer 1.6s linear infinite;
 }
 
-/* Màn hình chờ của phòng Online Meeting: tên lấy từ tài khoản nên ẩn ô nhập tên của LiveKit */
+:root {
+  --glass-bg: rgb(255 255 255 / 0.7);
+  --glass-border: rgb(255 255 255 / 0.7);
+  --glass-shadow: 0 1px 1px rgb(15 23 42 / 0.04), 0 10px 30px -12px rgb(30 64 175 / 0.18);
+  --glow: 0 8px 24px -8px rgb(37 99 235 / 0.55);
+  --page-bg: #eef3fd;
+  --blob-1: rgb(96 165 250 / 0.42);
+  --blob-2: rgb(167 139 250 / 0.3);
+  --blob-3: rgb(103 232 249 / 0.34);
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+  --glass-bg: rgb(22 32 54 / 0.66);
+  --glass-border: rgb(148 163 184 / 0.16);
+  --glass-shadow: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 16px 40px -16px rgb(0 0 0 / 0.7);
+  --glow: 0 8px 28px -8px rgb(59 130 246 / 0.7);
+  --page-bg: #070b17;
+  --blob-1: rgb(37 99 235 / 0.32);
+  --blob-2: rgb(124 58 237 / 0.22);
+  --blob-3: rgb(8 145 178 / 0.2);
+
+  --color-field: rgb(15 23 42 / 0.55);
+  --color-elevated: rgb(30 41 59 / 0.82);
+  --color-overlay: rgb(2 6 23 / 0.7);
+
+  /* Thang xám ĐẢO NGƯỢC: số nhỏ = gần nền (trong mờ), số lớn = chữ sáng */
+  --color-slate-50: rgb(148 163 184 / 0.07);
+  --color-slate-100: rgb(148 163 184 / 0.12);
+  --color-slate-200: rgb(148 163 184 / 0.17);
+  --color-slate-300: rgb(148 163 184 / 0.28);
+  --color-slate-400: #8a99ae;
+  --color-slate-500: #9aa8bc;
+  --color-slate-600: #c3cedd;
+  --color-slate-700: #dbe3ee;
+  --color-slate-800: #eaf0f7;
+  --color-slate-900: #f6f9fc;
+  --color-slate-950: #ffffff;
+
+  /* Các màu ngữ nghĩa: nền nhạt (50–200) thành lớp phủ trong mờ, chữ đậm (600–900) thành chữ sáng.
+     Mức 500 giữ nguyên vì dùng cho chấm màu / avatar có chữ trắng bên trên. */
+  --color-brand-50: rgb(59 130 246 / 0.12);
+  --color-brand-100: rgb(59 130 246 / 0.2);
+  --color-brand-200: rgb(59 130 246 / 0.32);
+  --color-brand-300: rgb(96 165 250 / 0.5);
+  --color-brand-600: #7fb2fb;
+  --color-brand-700: #9cc4fd;
+  --color-brand-800: #bfdbfe;
+  --color-brand-900: #dbeafe;
+
+  --color-amber-50: rgb(245 158 11 / 0.1);
+  --color-amber-100: rgb(245 158 11 / 0.17);
+  --color-amber-200: rgb(245 158 11 / 0.3);
+  --color-amber-300: rgb(245 158 11 / 0.45);
+  --color-amber-600: #fbbf24;
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fde68a;
+  --color-amber-900: #fef3c7;
+
+  --color-rose-50: rgb(244 63 94 / 0.11);
+  --color-rose-100: rgb(244 63 94 / 0.18);
+  --color-rose-200: rgb(244 63 94 / 0.32);
+  --color-rose-300: rgb(244 63 94 / 0.48);
+  --color-rose-600: #fb7185;
+  --color-rose-700: #fda4af;
+  --color-rose-800: #fecdd3;
+  --color-rose-900: #ffe4e6;
+
+  --color-emerald-50: rgb(16 185 129 / 0.11);
+  --color-emerald-100: rgb(16 185 129 / 0.18);
+  --color-emerald-200: rgb(16 185 129 / 0.3);
+  --color-emerald-300: rgb(16 185 129 / 0.45);
+  --color-emerald-600: #34d399;
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-800: #a7f3d0;
+  --color-emerald-900: #d1fae5;
+
+  --color-violet-50: rgb(139 92 246 / 0.12);
+  --color-violet-100: rgb(139 92 246 / 0.2);
+  --color-violet-200: rgb(139 92 246 / 0.32);
+  --color-violet-600: #a78bfa;
+  --color-violet-700: #c4b5fd;
+  --color-violet-800: #ddd6fe;
+
+  --color-sky-50: rgb(14 165 233 / 0.11);
+  --color-sky-100: rgb(14 165 233 / 0.18);
+  --color-sky-200: rgb(14 165 233 / 0.3);
+  --color-sky-600: #38bdf8;
+  --color-sky-700: #7dd3fc;
+  --color-sky-800: #bae6fd;
+}
+
+/* ---------- Nền trang: màu chuyển + các "đốm sáng" mờ phía sau lớp kính ---------- */
+html {
+  background: var(--page-bg);
+}
+body {
+  @apply font-sans text-slate-800 antialiased;
+  min-height: 100dvh;
+  font-feature-settings: "ss01", "cv11";
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(42rem 34rem at 8% -6%, var(--blob-1), transparent 62%),
+    radial-gradient(38rem 32rem at 98% 8%, var(--blob-2), transparent 60%),
+    radial-gradient(44rem 36rem at 60% 108%, var(--blob-3), transparent 62%);
+}
+
+/* Tiêu đề: chữ khít hơn một chút cho gọn (kiểu Notion) */
+h1,
+h2,
+h3 {
+  letter-spacing: -0.011em;
+}
+/* Ô tick, nút chọn, thanh trượt mặc định của trình duyệt dùng màu nhấn của sản phẩm */
+input[type="checkbox"],
+input[type="radio"],
+input[type="range"],
+progress {
+  accent-color: var(--color-brand-600);
+}
+::selection {
+  background: rgb(59 130 246 / 0.25);
+}
+
+/* ---------- Kính mờ ----------
+   `glass`      : bề mặt trong mờ của thẻ, cột, khung nội dung. KHÔNG làm nhòe nền.
+   `glass-blur` : thêm làm nhòe nền (backdrop-filter) — chỉ dùng cho thứ có nội dung trượt phía SAU nó:
+                  thanh tiêu đề dính trên cùng, hộp thoại.
+
+   Vì sao tách đôi? Làm nhòe nền là thao tác đồ họa đắt: mỗi khi bên trong / phía sau thay đổi, trình duyệt
+   phải tính lại lớp nhòe cho cả khối. Phía sau các thẻ chỉ có nền chuyển màu mịn — nhòe một nền đã mịn
+   thì mắt không thấy khác, nhưng GPU vẫn phải làm. Lúc đầu cột Kanban dùng làm nhòe nên kéo thẻ bị giật;
+   bỏ đi thì hình giống hệt mà kéo-thả và cuộn trang mượt hẳn. */
+@utility glass {
+  background-color: var(--glass-bg);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+@utility glass-blur {
+  background-color: var(--glass-bg);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
+}
+
+/* Nút chính: nền chuyển màu + quầng sáng nhẹ. Chữ trắng trên #2563eb → #1d4ed8 đạt ≥ 5:1 */
+@utility btn-primary {
+  color: #fff;
+  background-image: linear-gradient(135deg, #2f6df0 0%, #1d4ed8 100%);
+  box-shadow: var(--glow), 0 1px 0 rgb(255 255 255 / 0.25) inset;
+  &:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  &:disabled {
+    opacity: 0.55;
+    box-shadow: none;
+  }
+}
+@utility btn-danger {
+  color: #fff;
+  background-image: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
+  box-shadow: 0 8px 22px -10px rgb(225 29 72 / 0.6), 0 1px 0 rgb(255 255 255 / 0.2) inset;
+  &:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  &:disabled {
+    opacity: 0.55;
+    box-shadow: none;
+  }
+}
+
+/* Thẻ bấm được: nhấc nhẹ lên khi rê chuột */
+@utility lift {
+  transition:
+    transform 0.2s var(--ease-soft),
+    box-shadow 0.2s var(--ease-soft),
+    border-color 0.2s ease;
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 1px 1px rgb(15 23 42 / 0.05), 0 18px 36px -16px rgb(30 64 175 / 0.32);
+  }
+}
+
+/* Khung xương khi đang tải (thay cho dòng chữ "Đang tải…") */
+@utility skeleton {
+  border-radius: 0.5rem;
+  background: linear-gradient(90deg, var(--color-slate-100) 25%, var(--color-slate-200) 37%, var(--color-slate-100) 63%);
+  background-size: 400% 100%;
+  animation: var(--animate-shimmer);
+}
+
+/* Chữ tiêu đề chuyển màu (logo, tiêu đề trang đăng nhập) */
+@utility text-gradient {
+  background-image: linear-gradient(120deg, var(--color-brand-600), #7c3aed 55%, #0891b2);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@keyframes mf-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes mf-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+}
+@keyframes mf-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes mf-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+/* ---------- Khả năng truy cập ---------- */
+/* Viền tiêu điểm rõ ràng khi đi bằng bàn phím (không hiện khi bấm chuột) */
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
+/* Người dùng bật "giảm chuyển động" trong hệ điều hành → tắt gần hết animation */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Thanh cuộn mảnh, hợp với nền kính */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-slate-300) transparent;
+}
+
+/* ---------- Phòng họp Online Meeting (LiveKit) ---------- */
+/* Màn hình chờ: tên lấy từ tài khoản nên ẩn ô nhập tên của LiveKit */
 .mf-prejoin .lk-prejoin {
   width: 100%;
   margin: 0;

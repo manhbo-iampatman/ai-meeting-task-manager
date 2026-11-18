@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { Lock, Mic, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { addComment, deleteComment, deleteTask, getTask, moveTask, updateTask, type TaskInput } from '../../api/endpoints'
@@ -12,7 +13,7 @@ import Modal from '../Modal'
 import { Button, ErrorText, Label, Spinner } from '../ui'
 
 const selectCls =
-  'w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm outline-none focus:border-indigo-500 disabled:bg-slate-50 disabled:text-slate-500'
+  'w-full rounded-lg border border-slate-300 bg-field px-2.5 py-2 text-sm outline-none focus:border-brand-500 disabled:bg-slate-50 disabled:text-slate-500'
 
 /** Cửa sổ chi tiết công việc: sửa trực tiếp, mỗi thay đổi lưu ngay lên server. */
 export default function TaskModal({ taskId, board, onClose }: { taskId: number; board: BoardDetail; onClose: () => void }) {
@@ -67,10 +68,11 @@ export default function TaskModal({ taskId, board, onClose }: { taskId: number; 
               onChange={(e) => setTitle(e.target.value)}
               onBlur={() => title.trim() && title.trim() !== task.title && save.mutate({ title: title.trim() })}
               disabled={!editable}
-              className="flex-1 rounded-lg border border-transparent px-2 py-1 text-lg font-semibold outline-none hover:border-slate-200 focus:border-indigo-400"
+              aria-label="Tiêu đề công việc"
+              className="flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1 text-lg font-semibold outline-none transition hover:border-slate-200 focus:border-brand-400"
             />
-            <button onClick={onClose} className="rounded-lg px-2 py-1 text-slate-500 hover:bg-slate-100" aria-label="Đóng">
-              ✕
+            <button onClick={onClose} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" aria-label="Đóng">
+              <X className="size-5" aria-hidden="true" />
             </button>
           </div>
           <p className="px-2 text-xs text-slate-500">
@@ -78,7 +80,8 @@ export default function TaskModal({ taskId, board, onClose }: { taskId: number; 
           </p>
           {!editable && (
             <p className="mx-2 mt-2 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">
-              🔒 {NO_EDIT_REASON}. Bạn vẫn xem và bình luận được.
+              <Lock className="mr-1 inline size-3.5 align-[-2px]" aria-hidden="true" />
+              {NO_EDIT_REASON}. Bạn vẫn xem và bình luận được.
             </p>
           )}
 
@@ -92,13 +95,14 @@ export default function TaskModal({ taskId, board, onClose }: { taskId: number; 
                 onBlur={() => desc !== (task.description ?? '') && save.mutate({ description: desc || null })}
                 placeholder={editable ? 'Thêm mô tả chi tiết…' : 'Chưa có mô tả'}
                 disabled={!editable}
-                className="w-full disabled:bg-slate-50 rounded-lg border border-slate-300 p-2.5 text-sm outline-none focus:border-indigo-500"
+                className="w-full rounded-xl border border-slate-300 bg-field p-2.5 text-sm outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 disabled:opacity-70"
               />
 
               {task.source && (
                 <div className="mt-4 rounded-lg border border-violet-100 bg-violet-50/60 p-3 text-sm">
                   <p className="text-xs text-violet-700">
-                    🎙 Tạo từ cuộc họp{' '}
+                    <Mic className="mr-1 inline size-3.5 align-[-2px]" aria-hidden="true" />
+                    Tạo từ cuộc họp{' '}
                     <Link to={`/meetings/${task.source.meeting_id}`} className="font-medium underline">
                       {task.source.meeting_title}
                     </Link>{' '}
@@ -124,7 +128,7 @@ export default function TaskModal({ taskId, board, onClose }: { taskId: number; 
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   placeholder="Viết bình luận…"
-                  className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-indigo-500"
+                  className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-brand-500"
                 />
                 <Button type="submit" disabled={postComment.isPending || !comment.trim()}>
                   Gửi

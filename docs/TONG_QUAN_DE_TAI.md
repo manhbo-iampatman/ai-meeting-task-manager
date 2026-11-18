@@ -55,7 +55,7 @@ Chỉ **người tổ chức cuộc họp** bắt buộc có tài khoản; thàn
             │
  5. Người dùng duyệt, bấm "Đẩy lên bảng" ✅  con người kiểm soát kết quả AI
             │
- 6. Công việc lên bảng Kanban            📋  Cần làm / Đang làm / Hoàn thành
+ 6. Công việc lên bảng Kanban            📋  Cần làm / Đang làm / Chờ duyệt / Hoàn thành
             │
  7. Mọi người nhận thông báo, làm việc   🔔  nhắc hạn, theo dõi tiến độ
 ```
@@ -74,7 +74,7 @@ Ký hiệu: ✅ đã làm xong · 🔜 đang / sắp làm · 💡 mở rộng n�
 | F01 | Đăng ký, đăng nhập (mật khẩu băm bcrypt, JWT) | ✅ |
 | F02 | Hồ sơ cá nhân | ✅ |
 | F03 | Tạo nhóm, mời thành viên bằng link / email, phân quyền trưởng nhóm – thành viên, **biệt danh** thành viên | ✅ |
-| F04 | Nhiều bảng công việc mỗi nhóm, cột tùy chỉnh (mặc định Cần làm / Đang làm / Hoàn thành) | ✅ |
+| F04 | Nhiều bảng công việc mỗi nhóm, cột tùy chỉnh (mặc định Cần làm / Đang làm / Chờ duyệt / Hoàn thành) | ✅ |
 | F05 | Thẻ công việc: người làm, hạn chót, mức ưu tiên, mô tả, bình luận | ✅ |
 | F06 | **Kéo-thả** thẻ giữa các cột, **cập nhật realtime** cho mọi thành viên. Chỉ người làm, người tạo thẻ, trưởng nhóm được kéo / sửa / xóa (từ 18/11/2026) | ✅ |
 | F07 | Lọc / tìm kiếm, trang **"Việc của tôi"** | ✅ |

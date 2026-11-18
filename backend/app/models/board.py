@@ -21,7 +21,7 @@ class Board(TimestampMixin, Base):
 
 
 class BoardColumn(Base):
-    """Một cột trên bảng Kanban: Cần làm / Đang làm / Hoàn thành."""
+    """Một cột trên bảng Kanban: Cần làm / Đang làm / Chờ duyệt / Hoàn thành."""
 
     __tablename__ = "columns"
 

@@ -24,6 +24,7 @@ import {
 } from '@livekit/components-react'
 import '@livekit/components-styles'
 import { DisconnectReason, RoomEvent, Track } from 'livekit-client'
+import { ArrowLeft, ArrowRight, Check, Circle, Link2, Mic, MicOff, PhoneOff, Square, Video } from 'lucide-react'
 import {
   endRoom,
   getOpenRoom,
@@ -105,7 +106,7 @@ function ParticipantList({ hostId, ownerId }: { hostId: number | null; ownerId: 
               {/* Hai vai trò được điều khiển phòng (ghi âm, kết thúc): chủ phòng và trưởng nhóm */}
               <div className="mt-0.5 flex flex-wrap gap-1 empty:hidden">
                 {Number(p.identity) === hostId && (
-                  <span className="rounded bg-indigo-500/40 px-1.5 text-[10px]" title="Người đang giữ quyền chủ phòng buổi này">
+                  <span className="rounded bg-brand-500/40 px-1.5 text-[10px]" title="Người đang giữ quyền chủ phòng buổi này">
                     Chủ phòng
                   </span>
                 )}
@@ -119,7 +120,13 @@ function ParticipantList({ hostId, ownerId }: { hostId: number | null; ownerId: 
                 )}
               </div>
             </div>
-            <span title={p.isMicrophoneEnabled ? 'Mic đang bật' : 'Mic đang tắt'}>{p.isMicrophoneEnabled ? '🎙️' : '🔇'}</span>
+            <span title={p.isMicrophoneEnabled ? 'Mic đang bật' : 'Mic đang tắt'} className="mt-0.5 shrink-0">
+              {p.isMicrophoneEnabled ? (
+                <Mic className="size-4 text-emerald-400" aria-label="Mic đang bật" />
+              ) : (
+                <MicOff className="size-4 text-white/40" aria-label="Mic đang tắt" />
+              )}
+            </span>
           </li>
         ))}
       </ul>
@@ -204,13 +211,13 @@ function LiveRoom({ initial }: { initial: Room }) {
         </span>
         {recording === 'on' && (
           <span className="flex items-center gap-1.5 rounded-full bg-rose-600 px-2.5 py-0.5 text-xs font-medium">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-white" /> Đang ghi âm
+            <span className="h-2 w-2 animate-pulse rounded-full glass" /> Đang ghi âm
           </span>
         )}
         {recording === 'stopped' && <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs">Đã dừng ghi âm</span>}
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <button
-            className="rounded-lg border border-white/20 px-2.5 py-1 text-xs hover:bg-white/10"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 px-2.5 py-1 text-xs transition hover:bg-white/10"
             onClick={async () => {
               await navigator.clipboard.writeText(link)
               setCopied(true)
@@ -218,11 +225,19 @@ function LiveRoom({ initial }: { initial: Room }) {
             }}
             title={link}
           >
-            {copied ? '✓ Đã chép link' : '🔗 Chép link mời'}
+            {copied ? (
+              <>
+                <Check className="size-3.5 text-emerald-400" aria-hidden="true" /> Đã chép link
+              </>
+            ) : (
+              <>
+                <Link2 className="size-3.5" aria-hidden="true" /> Chép link mời
+              </>
+            )}
           </button>
           {room.can_control && recording === 'idle' && (
             <Button variant="danger" className="!py-1 text-xs" disabled={start.isPending} onClick={() => start.mutate()}>
-              ● Bắt đầu ghi
+              <Circle className="fill-current" aria-hidden="true" /> Bắt đầu ghi
             </Button>
           )}
           {room.can_control && recording === 'on' && (
@@ -232,7 +247,7 @@ function LiveRoom({ initial }: { initial: Room }) {
               disabled={stop.isPending}
               onClick={() => confirm('Dừng ghi âm? Buổi họp này sẽ KHÔNG ghi lại được nữa.') && stop.mutate()}
             >
-              ■ Dừng ghi
+              <Square className="fill-current" aria-hidden="true" /> Dừng ghi
             </Button>
           )}
           {room.can_control && (
@@ -260,7 +275,7 @@ function LiveRoom({ initial }: { initial: Room }) {
           {recorder === 'error' && <b> Trình duyệt này không ghi được mic của bạn — hãy dùng Chrome hoặc Edge bản mới.</b>}
         </p>
       )}
-      {hostNotice && <p className="bg-indigo-900/70 px-4 py-1.5 text-center text-xs text-indigo-100">{hostNotice}</p>}
+      {hostNotice && <p className="bg-brand-900/70 px-4 py-1.5 text-center text-xs text-brand-100">{hostNotice}</p>}
       {error && <p className="bg-amber-100 px-4 py-1.5 text-center text-xs text-amber-900">{error}</p>}
 
       <div className="flex min-h-0 flex-1">
@@ -300,6 +315,7 @@ function LiveRoom({ initial }: { initial: Room }) {
           </TrackToggle>
         )}
         <button type="button" className="lk-button lk-disconnect-button" onClick={onLeaveClick}>
+          <PhoneOff className="size-4" aria-hidden="true" />
           Rời phòng
         </button>
         <StartAudio label="Bấm để nghe mọi người" />
@@ -307,8 +323,8 @@ function LiveRoom({ initial }: { initial: Room }) {
 
       {/* Chủ phòng bấm "Rời phòng": hỏi lại như Google Meet để không vô tình bỏ phòng treo */}
       {leaveDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setLeaveDialog(false)}>
-          <div className="w-full max-w-sm rounded-xl bg-white p-5 text-slate-800 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex animate-fade items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setLeaveDialog(false)}>
+          <div className="glass-blur w-full max-w-sm animate-pop rounded-2xl border p-5 text-slate-800" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-base font-semibold">Bạn là chủ phòng</h2>
             {others.length > 0 ? (
               <p className="mt-1 text-sm text-slate-600">
@@ -365,7 +381,9 @@ function EndedView({ code, kicked }: { code: string; kicked: boolean }) {
 
   return (
     <div className="mx-auto max-w-md px-4 py-16 text-center">
-      <div className="text-4xl">📹</div>
+      <div className="glass mx-auto flex size-16 items-center justify-center rounded-2xl border">
+        <Video className="size-8 text-brand-600" aria-hidden="true" />
+      </div>
       <h1 className="mt-3 text-xl font-bold">{kicked || room?.status === 'ended' ? 'Buổi họp đã kết thúc' : 'Bạn đã rời phòng'}</h1>
       {room && <p className="mt-1 text-sm text-slate-500">{room.title}</p>}
 
@@ -386,7 +404,9 @@ function EndedView({ code, kicked }: { code: string; kicked: boolean }) {
       <div className="mt-6 flex flex-col items-center gap-2">
         {room?.meeting_id && (
           <Link to={`/meetings/${room.meeting_id}`}>
-            <Button>Xem cuộc họp & bản ghi →</Button>
+            <Button>
+              Xem cuộc họp & bản ghi <ArrowRight aria-hidden="true" />
+            </Button>
           </Link>
         )}
         {room?.status === 'open' && (
@@ -395,7 +415,7 @@ function EndedView({ code, kicked }: { code: string; kicked: boolean }) {
           </a>
         )}
         {room && (
-          <Link to={`/workspaces/${room.workspace_id}`} className="text-sm text-indigo-600 hover:underline">
+          <Link to={`/workspaces/${room.workspace_id}`} className="text-sm text-brand-600 hover:underline">
             Về trang nhóm
           </Link>
         )}
@@ -430,14 +450,18 @@ function Lobby({
   return (
     <div className="mx-auto w-full max-w-xl px-4 py-8">
       <Link to={backTo} className="text-sm text-slate-500 hover:underline">
-        ← {backLabel}
+        <ArrowLeft className="mr-1 inline size-4 align-[-3px]" aria-hidden="true" />
+        {backLabel}
       </Link>
-      <h1 className="mt-2 text-2xl font-bold">📹 {title}</h1>
+      <h1 className="mt-2 flex items-center gap-2.5 text-2xl font-bold tracking-tight">
+        <Video className="size-7 shrink-0 text-brand-600" aria-hidden="true" />
+        {title}
+      </h1>
       <p className="mt-1 text-sm text-slate-500">
         {subtitle} · bạn vào với tên <b>{me.full_name}</b>
       </p>
       {notices}
-      <div data-lk-theme="default" className="mf-prejoin mt-4 overflow-hidden rounded-xl">
+      <div data-lk-theme="default" className="mf-prejoin mt-4 overflow-hidden rounded-2xl shadow-xl ring-1 ring-black/5">
         <PreJoin
           defaults={{ username: me.full_name, audioEnabled: true, videoEnabled: false }}
           persistUserChoices={false}
@@ -513,7 +537,7 @@ function NewRoomLobby() {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
         <p className="text-rose-600">{errorMessage(error, 'Không tìm thấy nhóm để mở phòng họp')}</p>
-        <Link to="/" className="mt-4 inline-block text-sm text-indigo-600 hover:underline">
+        <Link to="/" className="mt-4 inline-block text-sm text-brand-600 hover:underline">
           Về trang nhóm
         </Link>
       </div>
@@ -603,7 +627,7 @@ function ExistingRoom({ code }: { code: string }) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
         <p className="text-rose-600">{errorMessage(error, 'Link phòng họp không đúng')}</p>
-        <Link to="/" className="mt-4 inline-block text-sm text-indigo-600 hover:underline">
+        <Link to="/" className="mt-4 inline-block text-sm text-brand-600 hover:underline">
           Về trang nhóm
         </Link>
       </div>
@@ -661,14 +685,15 @@ function ExistingRoom({ code }: { code: string }) {
       notices={
         <>
           {!room.is_member && (
-            <p className="mt-3 rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-800">
+            <p className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-800">
               Bạn chưa ở trong nhóm <b>{room.workspace_name}</b>. Bấm “Vào phòng” là bạn được thêm vào nhóm để nhận việc sau buổi
               họp.
             </p>
           )}
           {room.recording === 'on' && (
             <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
-              <b>● Phòng đang được ghi âm</b> để làm biên bản. Lời nói của bạn sẽ được ghi lại khi mic bật.
+              <span className="mr-1.5 inline-block size-2 animate-pulse rounded-full bg-rose-600 align-middle" aria-hidden="true" />
+              <b>Phòng đang được ghi âm</b> để làm biên bản. Lời nói của bạn sẽ được ghi lại khi mic bật.
             </p>
           )}
           {after === 'lost' && (

@@ -55,7 +55,7 @@ def main() -> None:
             db.add(WorkspaceMember(workspace_id=ws.id, user_id=u.id, role="owner" if i == 0 else "member", nicknames=nicks))
 
         board = create_board_with_default_columns(db, ws.id, "Bảng chính")
-        todo, doing, done = board.columns
+        todo, doing, _review, done = board.columns
         today = date.today()
         samples = [
             (todo, "Thiết kế cơ sở dữ liệu", users[0], today + timedelta(days=5), "high"),

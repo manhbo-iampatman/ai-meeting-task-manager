@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { Bell, Clock, Hand, TriangleAlert, Undo2, UserPlus, type LucideIcon } from 'lucide-react'
 import { listNotifications, markAllRead, markNotificationRead, undoClaim } from '../api/endpoints'
 import type { Notification } from '../api/types'
 import { errorMessage, formatDate, timeAgo } from '../lib/utils'
@@ -22,13 +23,23 @@ function text(n: Notification): string {
   return `Sắp đến hạn (${formatDate(p.due_date ?? null)}): “${p.task_title}”`
 }
 
-const ICON: Record<Notification['type'], string> = {
-  task_assigned: '📌',
-  task_due_soon: '⏰',
-  task_overdue: '⚠️',
-  name_claimed: '🙋',
-  name_claimed_member: '🙋',
-  name_claim_undone: '↩️',
+// Mỗi loại thông báo một biểu tượng + màu: nhìn lướt là biết việc gì
+const ICON: Record<Notification['type'], { icon: LucideIcon; tone: string }> = {
+  task_assigned: { icon: UserPlus, tone: 'bg-brand-100 text-brand-700' },
+  task_due_soon: { icon: Clock, tone: 'bg-amber-100 text-amber-700' },
+  task_overdue: { icon: TriangleAlert, tone: 'bg-rose-100 text-rose-700' },
+  name_claimed: { icon: Hand, tone: 'bg-emerald-100 text-emerald-700' },
+  name_claimed_member: { icon: Hand, tone: 'bg-emerald-100 text-emerald-700' },
+  name_claim_undone: { icon: Undo2, tone: 'bg-slate-100 text-slate-600' },
+}
+
+function TypeIcon({ type }: { type: Notification['type'] }) {
+  const { icon: Icon, tone } = ICON[type] ?? { icon: Bell, tone: 'bg-slate-100 text-slate-600' }
+  return (
+    <span className={`flex size-8 shrink-0 items-center justify-center rounded-full ${tone}`}>
+      <Icon className="size-4" aria-hidden="true" />
+    </span>
+  )
 }
 
 /** Bấm vào thông báo thì đi đâu */
@@ -79,26 +90,24 @@ export default function NotificationBell() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100"
-        aria-label="Thông báo"
+        className="relative rounded-xl p-2 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+        aria-label={unread > 0 ? `Thông báo (${unread} chưa đọc)` : 'Thông báo'}
+        aria-expanded={open}
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-          <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-        </svg>
+        <Bell className="size-5" aria-hidden="true" />
         {unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-rose-500 px-1 text-center text-[11px] font-semibold leading-[18px] text-white">
+          <span className="absolute -right-0.5 -top-0.5 min-w-[18px] animate-pop rounded-full bg-rose-600 px-1 text-center text-[11px] font-semibold leading-[18px] text-white shadow-sm">
             {unread > 9 ? '9+' : unread}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 z-40 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white shadow-lg">
+        <div className="absolute right-0 z-40 mt-2 w-[min(22rem,calc(100vw-2rem))] origin-top-right animate-pop overflow-hidden rounded-2xl border border-slate-200 bg-elevated shadow-xl">
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
             <span className="text-sm font-semibold">Thông báo</span>
             {unread > 0 && (
-              <button className="text-xs text-indigo-600 hover:underline" onClick={() => readAll.mutate()}>
+              <button className="text-xs text-brand-600 hover:underline" onClick={() => readAll.mutate()}>
                 Đánh dấu đã đọc hết
               </button>
             )}
@@ -106,7 +115,7 @@ export default function NotificationBell() {
           <ul className="max-h-96 overflow-y-auto">
             {data?.items.length === 0 && <li className="px-4 py-6 text-center text-sm text-slate-500">Chưa có thông báo</li>}
             {data?.items.map((n) => (
-              <li key={n.id} className={n.is_read ? '' : 'bg-indigo-50/50'}>
+              <li key={n.id} className={n.is_read ? '' : 'bg-brand-50/50'}>
                 <button
                   className="flex w-full gap-3 px-4 py-3 text-left hover:bg-slate-50"
                   onClick={() => {
@@ -115,22 +124,22 @@ export default function NotificationBell() {
                     navigate(target(n))
                   }}
                 >
-                  <span>{ICON[n.type] ?? '🔔'}</span>
+                  <TypeIcon type={n.type} />
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm text-slate-700">{text(n)}</span>
                     <span className="text-xs text-slate-400">
                       {n.payload.board_name ?? n.payload.workspace_name} · {timeAgo(n.created_at)}
                     </span>
                   </span>
-                  {!n.is_read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-indigo-500" />}
+                  {!n.is_read && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-brand-500" aria-label="Chưa đọc" />}
                 </button>
                 {n.type === 'name_claimed_member' && (
-                  <div className="-mt-1 px-4 pb-3 pl-11 text-xs">
+                  <div className="-mt-1 px-4 pb-3 pl-[3.75rem] text-xs">
                     {n.payload.undone ? (
                       <span className="text-slate-400">Đã hoàn tác</span>
                     ) : (
                       <button
-                        className="rounded-md border border-slate-300 bg-white px-2 py-1 font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-field px-2 py-1 font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
                         disabled={undo.isPending}
                         title="Nhận nhầm / nhận bậy? Trả các việc về lại tên chữ và gỡ biệt danh vừa thêm"
                         onClick={() => {
@@ -139,7 +148,7 @@ export default function NotificationBell() {
                           undo.mutate(n.payload.claim_id!)
                         }}
                       >
-                        ↩ Hoàn tác
+                        <Undo2 className="size-3.5" aria-hidden="true" /> Hoàn tác
                       </button>
                     )}
                   </div>

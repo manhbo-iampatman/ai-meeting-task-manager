@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { CalendarDays, PartyPopper } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { myTasks } from '../api/endpoints'
@@ -26,7 +27,7 @@ export default function MyTasksPage() {
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold">Việc của tôi</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Việc của tôi</h1>
         <label className="ml-auto flex items-center gap-2 text-sm text-slate-600">
           <input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} />
           Hiện cả việc đã xong
@@ -36,8 +37,9 @@ export default function MyTasksPage() {
 
       {isLoading && <Spinner />}
       {data?.length === 0 && (
-        <p className="mt-8 rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-          🎉 Bạn không có việc nào đang chờ.
+        <p className="mt-8 rounded-2xl border-2 border-dashed border-slate-300 p-10 text-center text-sm text-slate-500">
+          <PartyPopper className="mx-auto mb-2 size-8 text-brand-500" aria-hidden="true" />
+          Bạn không có việc nào đang chờ.
         </p>
       )}
 
@@ -50,13 +52,16 @@ export default function MyTasksPage() {
               <h2 className={`mb-2 text-sm font-semibold ${g.tone}`}>
                 {g.title} ({list.length})
               </h2>
-              <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+              <ul className="glass divide-y divide-slate-100 overflow-hidden rounded-2xl border">
                 {list.map((t) => (
                   <li key={t.id}>
-                    <Link to={`/boards/${t.board_id}?task=${t.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 hover:bg-slate-50">
+                    <Link to={`/boards/${t.board_id}?task=${t.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 transition-colors hover:bg-slate-50">
                       <span className={`min-w-0 flex-1 text-sm ${t.is_done ? 'text-slate-400 line-through' : ''}`}>{t.title}</span>
-                      <span className={`rounded px-1.5 py-0.5 text-[11px] ${PRIORITY[t.priority].className}`}>{PRIORITY[t.priority].label}</span>
-                      {t.due_date && <span className="text-xs text-slate-500">📅 {formatDate(t.due_date)}</span>}
+                      <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ${PRIORITY[t.priority].className}`}>{PRIORITY[t.priority].label}</span>
+                      {t.due_date && <span className="text-xs text-slate-500">
+                          <CalendarDays className="mr-1 inline size-3.5 align-[-2px]" aria-hidden="true" />
+                          {formatDate(t.due_date)}
+                        </span>}
                       <span className="w-full text-xs text-slate-400 sm:w-auto">
                         {t.workspace_name} › {t.board_name} › {t.column_name}
                       </span>

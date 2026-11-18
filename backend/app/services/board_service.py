@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Board, BoardColumn, Task
 
-DEFAULT_COLUMNS = [("Cần làm", False), ("Đang làm", False), ("Hoàn thành", True)]
+DEFAULT_COLUMNS = [("Cần làm", False), ("Đang làm", False), ("Chờ duyệt", False), ("Hoàn thành", True)]
 
 POSITION_GAP = 1000.0
 MIN_GAP = 1e-6

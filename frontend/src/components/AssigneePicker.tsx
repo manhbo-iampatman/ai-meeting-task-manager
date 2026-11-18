@@ -42,7 +42,7 @@ export default function AssigneePicker({
     if (!v && !assigneeName) setTyping(false) // bỏ dở, chưa gõ gì → quay lại như cũ
   }
 
-  const cls = `w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 disabled:bg-slate-50 ${className}`
+  const cls = `w-full rounded-lg border border-slate-300 bg-field px-2.5 py-1.5 text-sm outline-none focus:border-brand-500 disabled:bg-slate-50 ${className}`
   return (
     <div className="space-y-1.5">
       <select
@@ -66,7 +66,7 @@ export default function AssigneePicker({
             {m.full_name}
           </option>
         ))}
-        <option value={NAME}>✎ Người chưa có tài khoản (gõ tên)…</option>
+        <option value={NAME}>+ Người chưa có tài khoản (gõ tên)…</option>
       </select>
       {typing && (
         <input

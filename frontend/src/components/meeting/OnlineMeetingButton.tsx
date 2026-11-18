@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { Video } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { getOpenRoom } from '../../api/endpoints'
 import { Button } from '../ui'
@@ -20,10 +21,14 @@ export default function OnlineMeetingButton({ workspaceId }: { workspaceId: numb
     return (
       <Button onClick={() => navigate(`/room/${room.code}`)} title={`${room.title} · chủ phòng ${room.host?.full_name ?? ''}`}>
         <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" />
-        📹 Tham gia phòng
+        <Video aria-hidden="true" /> Tham gia phòng
         {room.recording === 'on' && <span className="rounded bg-rose-500 px-1 text-[10px]">đang ghi</span>}
       </Button>
     )
   }
-  return <Button onClick={() => navigate(`/room/new?ws=${workspaceId}`)}>📹 Online Meeting</Button>
+  return (
+    <Button onClick={() => navigate(`/room/new?ws=${workspaceId}`)}>
+      <Video aria-hidden="true" /> Online Meeting
+    </Button>
+  )
 }

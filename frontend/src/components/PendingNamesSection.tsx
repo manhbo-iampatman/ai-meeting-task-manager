@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ChevronDown, CircleCheck, Hand } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { claimName, listPendingNames } from '../api/endpoints'
@@ -20,9 +21,9 @@ function NameItem({ p, onClaim, busy }: { p: PendingName; onClaim: () => void; b
   const [open, setOpen] = useState(p.suggested)
   const others = p.variants.filter((v) => v !== p.name)
   return (
-    <li className={`rounded-lg border p-3 ${p.suggested ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-white'}`}>
+    <li className={`rounded-lg border p-3 ${p.suggested ? 'border-brand-300 glass' : 'border-slate-200 glass'}`}>
       {p.suggested && (
-        <p className="mb-1.5 text-xs font-medium text-indigo-700">
+        <p className="mb-1.5 text-xs font-medium text-brand-700">
           Bạn có phải là “{p.name}” không? Tên này giống tên của bạn.
         </p>
       )}
@@ -32,10 +33,10 @@ function NameItem({ p, onClaim, busy }: { p: PendingName; onClaim: () => void; b
         </span>
         {others.length > 0 && <span className="text-xs text-slate-400">còn viết là: {others.join(', ')}</span>}
         <button className="text-xs text-slate-500 hover:underline" onClick={() => setOpen((o) => !o)}>
-          {summary(p)} {open ? '▴' : '▾'}
+          {summary(p)} <ChevronDown className={`inline size-3.5 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
         </button>
         <Button className="ml-auto" variant={p.suggested ? 'primary' : 'secondary'} disabled={busy} onClick={onClaim}>
-          🙋 Đây là tôi
+          <Hand aria-hidden="true" /> Đây là tôi
         </Button>
       </div>
       {open && (
@@ -99,7 +100,10 @@ export default function PendingNamesSection({ workspaceId }: { workspaceId: numb
         Các tên được nhắc trong cuộc họp (hoặc gõ tay trên bảng) mà chưa khớp tài khoản nào — thường là biệt danh, tên
         thân mật. Nếu là bạn, bấm <b>Đây là tôi</b>: việc chuyển sang tài khoản của bạn ngay, trưởng nhóm sẽ được báo.
       </p>
-      {done && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">✓ {done}</p>}
+      {done && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          <CircleCheck className="mr-1 inline size-4 align-[-3px]" aria-hidden="true" />
+          {done}
+        </p>}
       <ul className="mt-3 space-y-2">
         {data?.map((p) => (
           <NameItem

@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from 'react'
+import { Search } from 'lucide-react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createColumn, deleteBoard, getBoard, renameBoard } from '../api/endpoints'
 import type { Priority, Task } from '../api/types'
 import KanbanBoard from '../components/board/KanbanBoard'
 import TaskModal from '../components/board/TaskModal'
-import { Spinner } from '../components/ui'
+import { FIELD, Spinner } from '../components/ui'
 import { useBoardSocket } from '../hooks/useBoardSocket'
 import { dueState, errorMessage, PRIORITY } from '../lib/utils'
 import { useAuth } from '../stores/auth'
@@ -13,7 +14,7 @@ import { useAuth } from '../stores/auth'
 type Filters = { q: string; assignee: string; priority: '' | Priority; due: '' | 'overdue' | 'soon' | 'none' }
 const EMPTY: Filters = { q: '', assignee: '', priority: '', due: '' }
 
-const selectCls = 'rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-indigo-500'
+const selectCls = `${FIELD} !px-2 !py-1.5`
 
 export default function BoardPage() {
   const id = Number(useParams().id)
@@ -63,7 +64,7 @@ export default function BoardPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Thanh tiêu đề + bộ lọc */}
-      <div className="border-b border-slate-200 bg-white px-4 py-3">
+      <div className="border-b border-slate-200 glass px-4 py-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <Link to={`/workspaces/${board.workspace_id}`} className="text-sm text-slate-500 hover:underline">
             {board.workspace_name}
@@ -97,12 +98,16 @@ export default function BoardPage() {
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <input
-            value={filters.q}
-            onChange={(e) => setFilters({ ...filters, q: e.target.value })}
-            placeholder="🔍 Tìm công việc…"
-            className="w-48 rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-indigo-500"
-          />
+          <label className="relative">
+            <span className="sr-only">Tìm công việc</span>
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <input
+              value={filters.q}
+              onChange={(e) => setFilters({ ...filters, q: e.target.value })}
+              placeholder="Tìm công việc…"
+              className={`w-52 ${FIELD} !py-1.5 !pl-8`}
+            />
+          </label>
           <select className={selectCls} value={filters.assignee} onChange={(e) => setFilters({ ...filters, assignee: e.target.value })}>
             <option value="">Mọi người</option>
             <option value="me">Việc của tôi</option>
@@ -133,7 +138,7 @@ export default function BoardPage() {
           </select>
           {filterFn && (
             <>
-              <button className="text-sm text-indigo-600 hover:underline" onClick={() => setFilters(EMPTY)}>
+              <button className="text-sm text-brand-600 hover:underline" onClick={() => setFilters(EMPTY)}>
                 Xóa bộ lọc
               </button>
               <span className="text-xs text-slate-500">(Tắt kéo-thả khi đang lọc)</span>
@@ -143,11 +148,13 @@ export default function BoardPage() {
       </div>
 
       {/* Vùng bảng: cuộn ngang khi nhiều cột */}
-      <div className="min-h-0 flex-1 overflow-x-auto p-4">
-        <div className="flex h-full items-start gap-3">
+      <div className="flex min-h-0 flex-1 overflow-x-auto p-4">
+        {/* Khối này tự giãn cao hết vùng bảng → "làn" của mỗi cột cao hết màn hình, thả thẻ vào khoảng trống
+            bên dưới một cột ngắn vẫn trúng cột đó */}
+        <div className="flex items-start gap-3">
           <KanbanBoard board={board} filterFn={filterFn} onOpenTask={openTask} />
           <button
-            className="w-64 shrink-0 rounded-xl border-2 border-dashed border-slate-300 px-3 py-3 text-left text-sm text-slate-500 hover:border-indigo-300 hover:text-indigo-600"
+            className="w-64 shrink-0 rounded-xl border-2 border-dashed border-slate-300 px-3 py-3 text-left text-sm text-slate-500 hover:border-brand-300 hover:text-brand-600"
             onClick={() => {
               const name = prompt('Tên cột mới')
               if (name?.trim()) addColumn.mutate(name.trim())

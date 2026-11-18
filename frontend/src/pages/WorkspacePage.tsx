@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { ArrowLeft, SquareKanban } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -65,7 +66,7 @@ function NicknameEditor({ ws, member, canEdit }: { ws: WorkspaceDetail; member: 
       {member.nicknames.length === 0 && <span className="text-xs text-slate-400">Chưa có biệt danh</span>}
       {canEdit && (
         <button
-          className="text-xs text-indigo-600 hover:underline"
+          className="text-xs text-brand-600 hover:underline"
           onClick={() => {
             setValue(member.nicknames.join(', '))
             setEditing(true)
@@ -128,13 +129,14 @@ export default function WorkspacePage() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8">
       <Link to="/" className="text-sm text-slate-500 hover:underline">
-        ← Nhóm của bạn
+        <ArrowLeft className="mr-1 inline size-4 align-[-3px]" aria-hidden="true" />
+        Nhóm của bạn
       </Link>
       <div className="mt-2 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold">{ws.name}</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{ws.name}</h1>
         {isOwner && (
           <button
-            className="text-sm text-indigo-600 hover:underline"
+            className="text-sm text-brand-600 hover:underline"
             onClick={() => {
               const name = prompt('Tên nhóm mới', ws.name)
               if (name?.trim()) rename.mutate(name.trim())
@@ -155,9 +157,10 @@ export default function WorkspacePage() {
               <Link
                 key={b.id}
                 to={`/boards/${b.id}`}
-                className="rounded-xl border border-slate-200 bg-white p-4 font-medium shadow-sm hover:border-indigo-300"
+                className="lift glass flex items-center gap-2.5 rounded-2xl border p-4 font-medium hover:border-brand-300"
               >
-                📋 {b.name}
+                <SquareKanban className="size-5 shrink-0 text-brand-600" aria-hidden="true" />
+                {b.name}
               </Link>
             ))}
           </div>
@@ -178,7 +181,7 @@ export default function WorkspacePage() {
         </section>
 
         {/* ---- Thành viên ---- */}
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <section className="glass rounded-2xl border p-5">
           <h2 className="font-semibold">Thành viên ({ws.members.length})</h2>
           <p className="mb-3 text-xs text-slate-500">
             Biệt danh giúp AI nhận ra ai được giao việc khi nghe cuộc họp (VD: “anh Nam”, “Nam béo”).
@@ -191,7 +194,7 @@ export default function WorkspacePage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium">{m.user.full_name}</span>
                     {m.role === 'owner' && (
-                      <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] text-indigo-700">Trưởng nhóm</span>
+                      <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] text-brand-700">Trưởng nhóm</span>
                     )}
                     {m.user.id === me.id && <span className="text-[11px] text-slate-400">(bạn)</span>}
                   </div>

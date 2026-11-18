@@ -14,8 +14,8 @@ def test_create_workspace_has_default_board(client):
     assert ws["my_role"] == "owner"
     assert len(ws["boards"]) == 1
     board = client.get(f"/api/boards/{ws['boards'][0]['id']}", headers=auth(owner)).json()
-    assert [c["name"] for c in board["columns"]] == ["Cần làm", "Đang làm", "Hoàn thành"]
-    assert [c["is_done"] for c in board["columns"]] == [False, False, True]
+    assert [c["name"] for c in board["columns"]] == ["Cần làm", "Đang làm", "Chờ duyệt", "Hoàn thành"]
+    assert [c["is_done"] for c in board["columns"]] == [False, False, False, True]
 
 
 def test_non_member_cannot_access(client):
@@ -135,7 +135,7 @@ def test_assign_notification_and_my_tasks(client):
     assert mine[0]["workspace_name"] == "Nhóm KLTN"
 
     # Chuyển sang cột Hoàn thành → không còn trong "việc của tôi"
-    client.post(f"/api/tasks/{task_id}/move", json={"column_id": cols[2]["id"], "index": 0}, headers=auth(member))
+    client.post(f"/api/tasks/{task_id}/move", json={"column_id": cols[-1]["id"], "index": 0}, headers=auth(member))
     assert client.get("/api/me/tasks", headers=auth(member)).json() == []
 
     client.post("/api/notifications/read-all", headers=auth(member))

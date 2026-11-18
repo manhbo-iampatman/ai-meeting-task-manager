@@ -77,7 +77,7 @@
 | F01 | Đăng ký / đăng nhập | Email + mật khẩu (bcrypt), JWT access + refresh token |
 | F02 | Hồ sơ cá nhân | Tên hiển thị, ảnh đại diện, **biệt danh** (dùng để AI nhận ra tên trong cuộc họp) |
 | F03 | Nhóm (workspace) | Tạo nhóm, mời thành viên bằng link hoặc email, vai trò Owner / Member |
-| F04 | Bảng công việc | Mỗi nhóm có nhiều bảng, mặc định 3 cột Cần làm / Đang làm / Hoàn thành |
+| F04 | Bảng công việc | Mỗi nhóm có nhiều bảng, mặc định 4 cột Cần làm / Đang làm / Chờ duyệt / Hoàn thành |
 | F05 | Thẻ công việc | Tiêu đề, mô tả, người làm, hạn chót, mức ưu tiên, nhãn, bình luận |
 | F06 | Kéo-thả | Kéo thẻ giữa các cột và đổi thứ tự trong cột, cập nhật realtime |
 | F07 | Lọc / tìm kiếm | Theo người làm, hạn chót, ưu tiên, "việc của tôi" |

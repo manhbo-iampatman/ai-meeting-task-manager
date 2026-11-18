@@ -1,4 +1,5 @@
 import { useRef, useState, type DragEvent, type FormEvent } from 'react'
+import { FileAudio, FileText } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { createMeeting } from '../../api/endpoints'
@@ -67,7 +68,7 @@ export default function UploadMeetingModal({ workspaceId, onClose }: { workspace
 
   const busy = uploadPct !== null
   const tabCls = (active: boolean) =>
-    `flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${active ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600'}`
+    `flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${active ? 'glass text-brand-700 shadow-sm' : 'text-slate-600'}`
 
   return (
     <Modal open onClose={busy ? () => {} : onClose}>
@@ -90,10 +91,12 @@ export default function UploadMeetingModal({ workspaceId, onClose }: { workspace
 
         <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
           <button type="button" className={tabCls(mode === 'file')} onClick={() => setMode('file')}>
-            🎙️ Tải file ghi âm
+            <FileAudio className="mr-1.5 inline size-4 align-[-3px]" aria-hidden="true" />
+            Tải file ghi âm
           </button>
           <button type="button" className={tabCls(mode === 'text')} onClick={() => setMode('text')}>
-            📝 Dán văn bản
+            <FileText className="mr-1.5 inline size-4 align-[-3px]" aria-hidden="true" />
+            Dán văn bản
           </button>
         </div>
 
@@ -107,7 +110,7 @@ export default function UploadMeetingModal({ workspaceId, onClose }: { workspace
             onDrop={onDrop}
             onClick={() => !busy && inputRef.current?.click()}
             className={`cursor-pointer rounded-xl border-2 border-dashed p-6 text-center transition ${
-              dragOver ? 'border-indigo-400 bg-indigo-50' : 'border-slate-300 hover:border-indigo-300'
+              dragOver ? 'border-brand-400 bg-brand-50' : 'border-slate-300 hover:border-brand-300'
             }`}
           >
             <input
@@ -137,7 +140,7 @@ export default function UploadMeetingModal({ workspaceId, onClose }: { workspace
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={'Dán biên bản / bản ghi cuộc họp vào đây. Mỗi dòng là 1 đoạn.\nVD:\nNam: Tuần này anh làm phần cơ sở dữ liệu, thứ Sáu xong.\nLan: Em chuẩn bị slide cho buổi demo.'}
-            className="w-full rounded-lg border border-slate-300 p-3 text-sm outline-none focus:border-indigo-500"
+            className="w-full rounded-lg border border-slate-300 p-3 text-sm outline-none focus:border-brand-500"
           />
         )}
 
@@ -148,7 +151,7 @@ export default function UploadMeetingModal({ workspaceId, onClose }: { workspace
               <span>{uploadPct}%</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full bg-indigo-500 transition-all" style={{ width: `${uploadPct}%` }} />
+              <div className="h-full bg-brand-500 transition-all" style={{ width: `${uploadPct}%` }} />
             </div>
           </div>
         )}

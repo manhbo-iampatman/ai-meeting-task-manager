@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type RefObject } from 'react'
+import { ArrowRight, CircleCheck, Play, TriangleAlert, Upload } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { pushToBoard, updateDraft } from '../../api/endpoints'
@@ -13,7 +14,7 @@ import { Button, ErrorText } from '../ui'
 const SpeakersKnown = createContext(false)
 
 const chip = 'rounded-full px-2 py-0.5 text-xs font-medium'
-const field = 'rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500'
+const field = 'rounded-lg border border-slate-300 bg-field px-2.5 py-1.5 text-sm outline-none focus:border-brand-500'
 
 /** Người làm (chế độ chỉ xem): ghép được tài khoản hay chưa, và vì sao chưa. */
 function Assignee({ t }: { t: ExtractedTask }) {
@@ -48,7 +49,7 @@ function Assignee({ t }: { t: ExtractedTask }) {
   if (t.assignee_name) {
     return (
       <span
-        className={`${chip} border border-dashed border-slate-400 bg-white text-slate-700`}
+        className={`${chip} border border-dashed border-slate-400 glass text-slate-700`}
         title="Chưa có tài khoản. Người này vào nhóm và bấm nhận tên thì việc chuyển sang họ."
       >
         {t.assignee_name} · chưa có tài khoản
@@ -125,17 +126,19 @@ function Evidence({ t, onPlay }: { t: ExtractedTask; onPlay: ((sec: number) => v
           <button
             type="button"
             onClick={() => onPlay(t.evidence_start!)}
-            className="mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-xs text-indigo-600 hover:bg-indigo-100"
+            className="mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-xs text-brand-600 hover:bg-brand-100"
             title="Nghe lại câu này"
           >
-            ▶ {formatClock(t.evidence_start)}
+            <Play className="mr-0.5 inline size-3 align-[-1px]" aria-hidden="true" />
+            {formatClock(t.evidence_start)}
           </button>
         )}
         <p className="italic leading-relaxed">“{t.evidence_quote}”</p>
       </div>
       {!t.evidence_found && (
         <p className="mt-1 text-xs font-medium not-italic">
-          ⚠ Không tìm thấy câu này trong bản ghi — có thể AI suy diễn. Hãy kiểm tra kỹ trước khi duyệt.
+          <TriangleAlert className="mr-1 inline size-3.5 align-[-2px]" aria-hidden="true" />
+          Không tìm thấy câu này trong bản ghi — có thể AI suy diễn. Hãy kiểm tra kỹ trước khi duyệt.
         </p>
       )}
     </div>
@@ -170,7 +173,7 @@ function DraftEditor({
           checked={t.selected}
           disabled={busy}
           onChange={(e) => onSave({ selected: e.target.checked })}
-          className="mt-2 h-4 w-4 shrink-0 accent-indigo-600"
+          className="mt-2 h-4 w-4 shrink-0 accent-brand-600"
           title={t.selected ? 'Bỏ tick: không đưa việc này lên bảng' : 'Tick: đưa việc này lên bảng'}
         />
         <div className="min-w-0 flex-1 space-y-2">
@@ -181,7 +184,7 @@ function DraftEditor({
               onBlur={() => title.trim() && title.trim() !== t.title && onSave({ title: title.trim() })}
               onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()}
               maxLength={255}
-              className={`min-w-0 flex-1 rounded-lg border border-transparent px-1.5 py-1 text-sm font-medium outline-none hover:border-slate-200 focus:border-indigo-400 ${off ? 'text-slate-400 line-through' : 'text-slate-900'}`}
+              className={`min-w-0 flex-1 rounded-lg border border-transparent px-1.5 py-1 text-sm font-medium outline-none hover:border-slate-200 focus:border-brand-400 ${off ? 'text-slate-400 line-through' : 'text-slate-900'}`}
             />
             {t.duplicate_of_task_id && (
               <span className={`${chip} bg-sky-100 text-sky-800`} title="Lần tóm tắt trước đã đẩy một việc giống hệt lên bảng">
@@ -346,7 +349,7 @@ export default function ExtractedTasksView({
 
   return (
     <SpeakersKnown.Provider value={meeting.source_type === 'online'}>
-    <div className="rounded-xl border border-slate-200 bg-white">
+    <div className="glass rounded-2xl border">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3">
         <h2 className="font-semibold">{canReview ? 'Duyệt đầu việc' : 'Đầu việc AI đề xuất'}</h2>
         <span className="text-xs text-slate-500">
@@ -359,9 +362,10 @@ export default function ExtractedTasksView({
 
       {pushedMsg && (
         <p className="border-b border-emerald-100 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
-          ✓ Đã đẩy {pushedMsg.n} việc lên bảng “{pushedMsg.board.name}”.{' '}
+          <CircleCheck className="mr-1 inline size-4 align-[-3px]" aria-hidden="true" />
+          Đã đẩy {pushedMsg.n} việc lên bảng “{pushedMsg.board.name}”.{' '}
           <Link to={`/boards/${pushedMsg.board.id}`} className="font-medium underline">
-            Mở bảng →
+            Mở bảng <ArrowRight className="inline size-3.5 align-[-2px]" aria-hidden="true" />
           </Link>
         </p>
       )}
@@ -429,7 +433,7 @@ export default function ExtractedTasksView({
                 if (confirm(msg)) push.mutate()
               }}
             >
-              ⬆ Đẩy {chosen.length} việc lên bảng
+              <Upload aria-hidden="true" /> Đẩy {chosen.length} việc lên bảng
             </Button>
           </div>
           <ErrorText>{(save.error || push.error) && errorMessage(save.error || push.error)}</ErrorText>
@@ -439,7 +443,8 @@ export default function ExtractedTasksView({
       {pushed.length > 0 && (
         <details className="border-t border-slate-100" open={todo.length === 0}>
           <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium text-slate-700">
-            ✓ Đã lên bảng ({pushed.length})
+            <CircleCheck className="mr-1 inline size-4 align-[-3px] text-emerald-600" aria-hidden="true" />
+            Đã lên bảng ({pushed.length})
           </summary>
           <ul className="divide-y divide-slate-100 border-t border-slate-100">
             {pushed.map((t) => (
@@ -450,7 +455,7 @@ export default function ExtractedTasksView({
                   {t.due_date && ` · ${formatDate(t.due_date)}`}
                 </span>
                 {t.task_id && t.task_board_id ? (
-                  <Link to={`/boards/${t.task_board_id}?task=${t.task_id}`} className="text-xs text-indigo-600 hover:underline">
+                  <Link to={`/boards/${t.task_board_id}?task=${t.task_id}`} className="text-xs text-brand-600 hover:underline">
                     Mở thẻ
                   </Link>
                 ) : (

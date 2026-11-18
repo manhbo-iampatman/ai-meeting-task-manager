@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
+import { Pencil } from 'lucide-react'
 import type { Segment } from '../../api/types'
 import { formatClock } from '../../lib/utils'
 import { Button } from '../ui'
@@ -77,7 +78,7 @@ export default function TranscriptView({
   const wordCount = segments.reduce((n, s) => n + s.text.split(/\s+/).filter(Boolean).length, 0)
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white">
+    <div className="glass rounded-2xl border">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3">
         <h2 className="font-semibold">Bản ghi</h2>
         <span className="text-xs text-slate-500">
@@ -92,7 +93,7 @@ export default function TranscriptView({
           )}
           {editable && !editing && (
             <Button variant="secondary" onClick={() => setEditing(true)}>
-              ✏️ Sửa bản ghi
+              <Pencil aria-hidden="true" /> Sửa bản ghi
             </Button>
           )}
           {editing && (
@@ -129,13 +130,13 @@ export default function TranscriptView({
             ref={(el) => {
               itemRefs.current[i] = el
             }}
-            className={`flex gap-3 px-4 py-2 ${!editing && i === current ? 'bg-indigo-50' : ''}`}
+            className={`flex gap-3 px-4 py-2 ${!editing && i === current ? 'bg-brand-50' : ''}`}
           >
             {s.start != null ? (
               <button
                 type="button"
                 onClick={() => seek(s.start)}
-                className="mt-0.5 h-fit shrink-0 rounded px-1.5 py-0.5 font-mono text-xs text-indigo-600 hover:bg-indigo-100"
+                className="mt-0.5 h-fit shrink-0 rounded px-1.5 py-0.5 font-mono text-xs text-brand-600 hover:bg-brand-100"
                 title="Nghe đoạn này"
               >
                 {formatClock(s.start)}
@@ -145,18 +146,18 @@ export default function TranscriptView({
             )}
             {editing ? (
               <div className="w-full">
-                {s.speaker && <div className="mb-0.5 text-xs font-semibold text-indigo-700">{s.speaker}</div>}
+                {s.speaker && <div className="mb-0.5 text-xs font-semibold text-brand-700">{s.speaker}</div>}
               <textarea
                 value={s.text}
                 rows={Math.max(1, Math.ceil(s.text.length / 90))}
                 onChange={(e) => setDraft((d) => d.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))}
-                className="w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm outline-none focus:border-indigo-400"
+                className="w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm outline-none focus:border-brand-400"
               />
               </div>
             ) : (
               <p className={`text-sm leading-relaxed ${i === current ? 'text-slate-900' : 'text-slate-700'}`}>
                 {/* Online Meeting: mỗi người ghi bằng mic của mình nên biết chắc ai nói câu này */}
-                {s.speaker && <span className="font-semibold text-indigo-700">{s.speaker}: </span>}
+                {s.speaker && <span className="font-semibold text-brand-700">{s.speaker}: </span>}
                 {s.text}
               </p>
             )}

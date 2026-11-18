@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Mic, Pause, Play, Square } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRecorder } from '../../hooks/useRecorder'
@@ -81,8 +82,8 @@ export default function RecordMeetingModal({ workspaceId, onClose }: { workspace
           <p className="text-xs text-slate-500">
             {rec.state === 'idle' && 'Bấm nút đỏ để bắt đầu ghi'}
             {rec.state === 'requesting' && 'Đang xin quyền dùng micro… (hãy bấm "Cho phép")'}
-            {rec.state === 'recording' && '● Đang ghi âm'}
-            {rec.state === 'paused' && '⏸ Tạm dừng'}
+            {rec.state === 'recording' && 'Đang ghi âm'}
+            {rec.state === 'paused' && 'Đang tạm dừng'}
             {rec.state === 'stopped' && (uploadPct !== null ? `Đang tải lên… ${uploadPct}%` : 'Đã dừng ghi')}
           </p>
 
@@ -90,19 +91,27 @@ export default function RecordMeetingModal({ workspaceId, onClose }: { workspace
             {(rec.state === 'idle' || rec.state === 'error') && (
               <button
                 onClick={() => rec.start({ workspaceId, title: finalTitle, meetingDate: date })}
-                className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-600 text-white shadow-lg hover:bg-rose-700"
+                className="btn-danger flex size-16 items-center justify-center rounded-full transition duration-150 hover:scale-105 active:scale-95"
                 aria-label="Bắt đầu ghi âm"
               >
-                <span className="h-6 w-6 rounded-full bg-white" />
+                <Mic className="size-7" aria-hidden="true" />
               </button>
             )}
             {active && (
               <>
                 <Button variant="secondary" onClick={rec.state === 'recording' ? rec.pause : rec.resume}>
-                  {rec.state === 'recording' ? '⏸ Tạm dừng' : '▶ Ghi tiếp'}
+                  {rec.state === 'recording' ? (
+                    <>
+                      <Pause aria-hidden="true" /> Tạm dừng
+                    </>
+                  ) : (
+                    <>
+                      <Play aria-hidden="true" /> Ghi tiếp
+                    </>
+                  )}
                 </Button>
                 <Button variant="danger" onClick={stopAndUpload}>
-                  ⏹ Dừng & xử lý
+                  <Square aria-hidden="true" /> Dừng & xử lý
                 </Button>
               </>
             )}
@@ -111,7 +120,7 @@ export default function RecordMeetingModal({ workspaceId, onClose }: { workspace
 
         {uploadPct !== null && (
           <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-            <div className="h-full bg-indigo-500 transition-all" style={{ width: `${uploadPct}%` }} />
+            <div className="h-full bg-brand-500 transition-all" style={{ width: `${uploadPct}%` }} />
           </div>
         )}
 

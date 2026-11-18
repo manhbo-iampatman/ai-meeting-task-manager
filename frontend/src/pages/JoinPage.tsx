@@ -28,7 +28,7 @@ export default function JoinPage() {
   return (
     <div className="mx-auto max-w-md px-4 py-16 text-center">
       <p className="text-rose-600">{error}</p>
-      <Link to="/" className="mt-4 inline-block text-sm text-indigo-600 hover:underline">
+      <Link to="/" className="mt-4 inline-block text-sm text-brand-600 hover:underline">
         Về trang nhóm
       </Link>
     </div>

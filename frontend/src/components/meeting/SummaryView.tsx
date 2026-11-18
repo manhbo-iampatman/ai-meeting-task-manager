@@ -1,10 +1,12 @@
+import type { ReactNode } from 'react'
+import { CircleCheck, CircleHelp, MessagesSquare, Sparkles } from 'lucide-react'
 import type { MeetingSummary } from '../../api/types'
 import { formatDateTime } from '../../lib/utils'
 
-function Block({ icon, title, items, empty }: { icon: string; title: string; items: string[]; empty: string }) {
+function Block({ icon, title, items, empty }: { icon: ReactNode; title: string; items: string[]; empty: string }) {
   return (
     <div>
-      <h3 className="mb-1.5 text-sm font-semibold text-slate-700">
+      <h3 className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
         {icon} {title} <span className="font-normal text-slate-400">({items.length})</span>
       </h3>
       {items.length === 0 ? (
@@ -23,10 +25,12 @@ function Block({ icon, title, items, empty }: { icon: string; title: string; ite
 /** F13: biên bản do AI viết — chủ đề, ý chính, quyết định đã chốt, vấn đề còn mở. */
 export default function SummaryView({ summary }: { summary: MeetingSummary }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white">
+    <div className="glass rounded-2xl border">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3">
         <h2 className="font-semibold">Biên bản cuộc họp</h2>
-        <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">AI viết</span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+          <Sparkles className="size-3" aria-hidden="true" /> AI viết
+        </span>
         {summary.fallback_from && (
           <span
             className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
@@ -48,9 +52,9 @@ export default function SummaryView({ summary }: { summary: MeetingSummary }) {
           <span className="font-semibold">Chủ đề: </span>
           {summary.topic || <span className="text-slate-400">(AI không nêu chủ đề)</span>}
         </p>
-        <Block icon="💬" title="Ý chính đã thảo luận" items={summary.key_points} empty="Không có." />
-        <Block icon="✅" title="Quyết định đã chốt" items={summary.decisions} empty="Cuộc họp chưa chốt quyết định nào." />
-        <Block icon="❓" title="Vấn đề còn mở" items={summary.open_issues} empty="Không còn vấn đề nào bỏ ngỏ." />
+        <Block icon={<MessagesSquare className="size-4 text-brand-600" aria-hidden="true" />} title="Ý chính đã thảo luận" items={summary.key_points} empty="Không có." />
+        <Block icon={<CircleCheck className="size-4 text-emerald-600" aria-hidden="true" />} title="Quyết định đã chốt" items={summary.decisions} empty="Cuộc họp chưa chốt quyết định nào." />
+        <Block icon={<CircleHelp className="size-4 text-amber-600" aria-hidden="true" />} title="Vấn đề còn mở" items={summary.open_issues} empty="Không còn vấn đề nào bỏ ngỏ." />
       </div>
 
       <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-400">

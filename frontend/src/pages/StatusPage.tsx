@@ -18,7 +18,12 @@ function Badge({ s }: { s: ComponentStatus['status'] }) {
     not_installed: 'bg-amber-100 text-amber-700',
   }[s]
   const text = { ok: 'Hoạt động', error: 'Lỗi', not_installed: 'Chưa cài' }[s]
-  return <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${style}`}>{text}</span>
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${style}`}>
+      <span className={`size-1.5 rounded-full bg-current ${s === 'ok' ? 'animate-pulse' : ''}`} aria-hidden="true" />
+      {text}
+    </span>
+  )
 }
 
 export default function StatusPage() {
@@ -30,12 +35,12 @@ export default function StatusPage() {
 
   return (
     <div className="mx-auto max-w-xl px-4 py-12">
-      <h1 className="text-2xl font-bold">MeetFlow</h1>
+      <h1 className="text-gradient text-3xl font-bold tracking-tight">MeetFlow</h1>
       <p className="mt-1 text-sm text-slate-500">
         Quản lý công việc nhóm · AI tóm tắt cuộc họp và tạo đầu việc
       </p>
 
-      <div className="mt-8 rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="glass mt-8 animate-page overflow-hidden rounded-2xl border">
         <div className="border-b border-slate-200 px-5 py-3 font-semibold">Trạng thái hệ thống</div>
 
         {isLoading && <p className="px-5 py-4 text-sm text-slate-500">Đang kiểm tra…</p>}
