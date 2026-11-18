@@ -5,12 +5,15 @@ import type {
   BoardDetail,
   Column,
   Comment,
+  DraftInput,
   Meeting,
   MeetingDetail,
   Member,
   MyTask,
+  NameClaim,
   Notification,
   NotificationList,
+  PendingName,
   Priority,
   Segment,
   Task,
@@ -63,6 +66,8 @@ export type TaskInput = {
   title?: string
   description?: string | null
   assignee_id?: number | null
+  /** F20: giao theo tên chữ khi người đó chưa có tài khoản */
+  assignee_name?: string | null
   due_date?: string | null
   priority?: Priority
 }
@@ -111,6 +116,18 @@ export const deleteMeeting = (id: number) => api.delete(`/meetings/${id}`)
 export const retryMeeting = (id: number) => data(api.post<MeetingDetail>(`/meetings/${id}/retry`))
 /** Nhờ AI tóm tắt + tách đầu việc. Trả về ngay (status = summarizing), worker xử lý nền. */
 export const summarizeMeeting = (id: number) => data(api.post<MeetingDetail>(`/meetings/${id}/summarize`))
+// ---- Giai đoạn 5: duyệt + đẩy lên bảng (F17) ----
+export const updateDraft = (id: number, body: DraftInput) =>
+  data(api.patch<MeetingDetail>(`/extracted-tasks/${id}`, body))
+export const pushToBoard = (meetingId: number, boardId: number) =>
+  data(api.post<MeetingDetail>(`/meetings/${meetingId}/push`, { board_id: boardId }))
+
+// ---- F21: tự nhận tên ----
+export const listPendingNames = (workspaceId: number) =>
+  data(api.get<PendingName[]>(`/workspaces/${workspaceId}/pending-names`))
+export const claimName = (workspaceId: number, key: string) =>
+  data(api.post<NameClaim>(`/workspaces/${workspaceId}/pending-names/claim`, { key }))
+export const undoClaim = (claimId: number) => data(api.post<NameClaim>(`/name-claims/${claimId}/undo`))
 export const updateTranscript = (id: number, segments: Segment[]) =>
   data(api.put<MeetingDetail>(`/meetings/${id}/transcript`, { segments }))
 /** Thẻ <audio> không gửi được header → đưa token vào URL. */

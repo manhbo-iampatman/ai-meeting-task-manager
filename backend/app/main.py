@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, boards, health, meetings, notifications, realtime, tasks, workspaces
+from app.api.routes import auth, boards, health, meetings, names, notifications, realtime, tasks, workspaces
 from app.core.config import get_settings
 from app.core.realtime import redis_listener
 
@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=f"{settings.APP_NAME} API",
     description="Hệ thống quản lý công việc nhóm tích hợp AI tóm tắt cuộc họp và tạo đầu việc",
-    version="0.4.0",
+    version="0.5.0",
     lifespan=lifespan,
 )
 
@@ -48,5 +48,5 @@ app.add_middleware(
 )
 
 # Mọi API đều có tiền tố /api
-for r in (health, auth, workspaces, boards, tasks, meetings, notifications, realtime):
+for r in (health, auth, workspaces, boards, tasks, meetings, names, notifications, realtime):
     app.include_router(r.router, prefix="/api")

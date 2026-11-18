@@ -7,6 +7,7 @@ export const STATUS_INFO: Record<MeetingStatus, { label: string; className: stri
   transcribed: { label: 'Đã có bản ghi', className: 'bg-emerald-100 text-emerald-700' },
   summarizing: { label: 'AI đang tóm tắt', className: 'bg-violet-100 text-violet-700' },
   review: { label: 'Chờ duyệt đầu việc', className: 'bg-indigo-100 text-indigo-700' },
+  done: { label: 'Đã lên bảng', className: 'bg-emerald-100 text-emerald-700' },
   failed: { label: 'Lỗi', className: 'bg-rose-100 text-rose-700' },
 }
 

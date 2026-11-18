@@ -1,26 +1,31 @@
-"""F09–F16: tạo cuộc họp, tải ghi âm / văn bản, theo dõi xử lý, xem & sửa bản ghi, tóm tắt bằng AI."""
+"""F09–F18: tạo cuộc họp, tải ghi âm / văn bản, theo dõi xử lý, xem & sửa bản ghi, tóm tắt bằng AI,
+duyệt đầu việc và đẩy lên bảng."""
 
 from datetime import date
 
-from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 
-from app.api.deps import DB, CurrentUser, get_membership
+from app.api.deps import DB, CurrentUser, ensure_member_user, get_board_for_member, get_membership
+from app.api.routes.boards import board_changed
 from app.core.database import SessionLocal
 from app.core.security import decode_access_token
 from app.core.realtime import publish_event, workspace_room
-from app.models import Meeting, MeetingStatus, User, WorkspaceMember
+from app.models import ExtractedTask, ExtractedTaskStatus, Meeting, MeetingStatus, User, WorkspaceMember
 from app.schemas.meeting import (
     ExtractedTaskOut,
+    ExtractedTaskUpdate,
     MeetingDetail,
     MeetingOut,
     MeetingUpdate,
+    PushIn,
     SummaryOut,
     TranscriptOut,
     TranscriptUpdate,
 )
 from app.services import meeting_service as svc
+from app.services import review_service
 
 router = APIRouter(tags=["meetings"])
 
@@ -59,13 +64,20 @@ def _summary_out(m: Meeting) -> SummaryOut | None:
     )
 
 
-def _detail(m: Meeting) -> MeetingDetail:
+def _draft_out(t: ExtractedTask) -> ExtractedTaskOut:
+    out = ExtractedTaskOut.model_validate(t)
+    out.task_board_id = t.task.board_id if t.task else None
+    return out
+
+
+def _detail(m: Meeting, db: DB, user: User) -> MeetingDetail:
     return MeetingDetail(
         **_out(m).model_dump(),
         has_audio=bool(m.audio_path),
         transcript=TranscriptOut.model_validate(m.transcript) if m.transcript else None,
         summary=_summary_out(m),
-        extracted_tasks=[ExtractedTaskOut.model_validate(t) for t in m.extracted_tasks],
+        extracted_tasks=[_draft_out(t) for t in m.extracted_tasks],
+        can_review=review_service.can_review(db, m, user),
     )
 
 
@@ -139,12 +151,12 @@ def create_meeting(
     db.commit()
     db.refresh(m)
     svc.notify_meeting(m)
-    return _detail(m)
+    return _detail(m, db, user)
 
 
 @router.get("/meetings/{meeting_id}", response_model=MeetingDetail)
 def get_meeting(meeting_id: int, user: CurrentUser, db: DB):
-    return _detail(_get_meeting(db, meeting_id, user))
+    return _detail(_get_meeting(db, meeting_id, user), db, user)
 
 
 @router.patch("/meetings/{meeting_id}", response_model=MeetingDetail)
@@ -157,7 +169,7 @@ def update_meeting(meeting_id: int, data: MeetingUpdate, user: CurrentUser, db: 
     db.commit()
     db.refresh(m)
     svc.notify_meeting(m)
-    return _detail(m)
+    return _detail(m, db, user)
 
 
 @router.delete("/meetings/{meeting_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -184,7 +196,7 @@ def retry_meeting(meeting_id: int, user: CurrentUser, db: DB):
     db.commit()
     db.refresh(m)
     svc.notify_meeting(m)
-    return _detail(m)
+    return _detail(m, db, user)
 
 
 @router.put("/meetings/{meeting_id}/transcript", response_model=MeetingDetail)
@@ -204,7 +216,7 @@ def update_transcript(meeting_id: int, data: TranscriptUpdate, user: CurrentUser
     db.commit()
     db.refresh(m)
     svc.notify_meeting(m)
-    return _detail(m)
+    return _detail(m, db, user)
 
 
 @router.post("/meetings/{meeting_id}/summarize", response_model=MeetingDetail)
@@ -223,7 +235,66 @@ def summarize_meeting(meeting_id: int, user: CurrentUser, db: DB):
     db.commit()
     db.refresh(m)
     svc.notify_meeting(m)
-    return _detail(m)
+    return _detail(m, db, user)
+
+
+# ---------- Giai đoạn 5: duyệt đầu việc nháp và đẩy lên bảng (F17) ----------
+
+
+@router.patch("/extracted-tasks/{draft_id}", response_model=MeetingDetail)
+def update_draft(draft_id: int, data: ExtractedTaskUpdate, user: CurrentUser, db: DB):
+    """Người duyệt sửa một đầu việc nháp (tiêu đề, người làm, hạn, ưu tiên, tick)."""
+    d = db.get(ExtractedTask, draft_id)
+    if d is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Không tìm thấy đầu việc")
+    m = _get_meeting(db, d.meeting_id, user)
+    review_service.require_reviewer(db, m, user)
+    if m.status in MeetingStatus.PROCESSING:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Cuộc họp đang được xử lý")
+    if d.status == ExtractedTaskStatus.ACCEPTED:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Việc này đã lên bảng — hãy sửa trực tiếp trên bảng")
+
+    changes = data.model_dump(exclude_unset=True)
+    if "title" in changes:
+        if not changes["title"]:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Tiêu đề không được để trống")
+        d.title = changes["title"]
+    if "assignee_id" in changes or "assignee_name" in changes:
+        uid, name = changes.get("assignee_id"), changes.get("assignee_name") or None
+        if uid is not None:
+            ensure_member_user(db, m.workspace_id, uid)
+            name = None  # đã chọn tài khoản thì bỏ tên chữ
+        d.assignee_id, d.assignee_name = uid, name
+        d.assignee_match = "manual"  # người duyệt tự chọn
+    if "due_date" in changes:
+        d.due_date = changes["due_date"]
+        d.due_approximate = False  # người duyệt đã chọn ngày → không còn là ước lượng
+    if changes.get("priority"):
+        d.priority = changes["priority"]
+    if "selected" in changes and changes["selected"] is not None:
+        d.selected = changes["selected"]
+        if d.selected and d.status == ExtractedTaskStatus.REJECTED:
+            d.status = ExtractedTaskStatus.PENDING  # tick lại việc đã bỏ
+    db.commit()
+    db.refresh(d)  # nạp lại quan hệ `assignee` sau khi đổi người làm
+    db.refresh(m)
+    return _detail(m, db, user)
+
+
+@router.post("/meetings/{meeting_id}/push", response_model=MeetingDetail)
+def push_to_board(meeting_id: int, data: PushIn, user: CurrentUser, db: DB, background: BackgroundTasks):
+    """F17: "Đẩy lên bảng" — các việc đang tick thành thẻ thật, trong MỘT transaction."""
+    m = _get_meeting(db, meeting_id, user)
+    review_service.require_reviewer(db, m, user)
+    board = get_board_for_member(db, data.board_id, user)
+    created = review_service.push_to_board(db, m, board, user)
+    db.commit()
+    db.refresh(m)
+    board_changed(background, board.id, user.id)
+    svc.notify_meeting(m)
+    if any(t.assignee_name for t in created):  # có tên mới chờ người nhận (F21)
+        publish_event(workspace_room(m.workspace_id), {"type": "names_updated"})
+    return _detail(m, db, user)
 
 
 @router.get("/meetings/{meeting_id}/audio")

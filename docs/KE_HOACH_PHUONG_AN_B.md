@@ -230,9 +230,11 @@ Công cụ: thư viện `jiwer`.
 - [ ] Provider Ollama để so sánh
 - **Kiến thức cần nắm:** LLM là gì, prompt engineering, structured output, hallucination và cách giảm (trích dẫn câu gốc, con người duyệt)
 
-### Giai đoạn 5 – Duyệt & đẩy lên bảng (Tuần 10: 18/01 – 24/01)
-- [ ] Màn hình duyệt, nút "Đẩy lên bảng" tạo nhiều task trong 1 transaction (F17)
-- [ ] Lịch sử họp, xuất PDF/DOCX (F18–F19)
+### Giai đoạn 5 – Duyệt & đẩy lên bảng (Tuần 10: 18/01 – 24/01) — làm sớm 17/11/2026
+- [x] Màn hình duyệt, nút "Đẩy lên bảng" tạo nhiều task trong 1 transaction (F17)
+- [x] Truy vết thẻ ↔ cuộc họp + câu gốc (F18, phần truy vết)
+- [x] Giao việc theo tên (F20) + tự nhận tên, trưởng nhóm hoàn tác (F21) — xem mục 15–16
+- [ ] Lịch sử họp đầy đủ, xuất PDF/DOCX (F19) — để lượt sau
 
 ### Giai đoạn 6 – Thực nghiệm (Tuần 11: 25/01 – 31/01)
 - [ ] Thu, gán nhãn dữ liệu, viết script đánh giá, chạy 3 thí nghiệm, vẽ biểu đồ
@@ -370,12 +372,33 @@ Chi tiết và lý do: `docs/GIAI_THICH_GIAI_DOAN_4.md`.
 |---|---|
 | Hướng làm F21 | **Người dùng tự nhận tên của mình**, thay cho việc hệ thống tự gộp theo tên |
 | Bấm nhận tên | **Có hiệu lực ngay**; trưởng nhóm nhận thông báo và có thể **hoàn tác** nếu nhận nhầm / nhận bậy |
-| Làm trong giai đoạn nào | *Chờ chốt* — đề xuất: làm F20 + tự nhận tên **ngay trong GĐ5**, cùng màn hình duyệt |
+| Làm trong giai đoạn nào | **Ngay trong GĐ5**, cùng màn hình duyệt (chốt 17/11/2026) |
 
-**Đề xuất đi kèm (chốt khi bắt đầu làm):**
+**Đề xuất đi kèm (đã chốt cả 4 điểm đầu, 17/11/2026):**
 - Nhận theo **tên** chứ không theo từng việc: nhận "Su" = nhận mọi việc mang tên "Su". Một người nhận được nhiều tên.
 - Tên vừa nhận được **lưu thành biệt danh** của người đó trong nhóm → các cuộc họp sau AI tự ghép đúng (hệ thống "học" qua biệt danh).
-- **Mọi thành viên** đều xem được danh sách, không chỉ người mới vào (thành viên cũ cũng có thể bị gọi bằng biệt danh lạ).
+- **Mọi thành viên** đều xem được danh sách, không chỉ người mới vào (thành viên cũ cũng có thể bị gọi bằng biệt danh lạ). *(18/11: sửa lại — người đã nhận tên thì không thấy danh sách nữa, xem mục 16.)*
 - Việc mà người nói tự nhận bằng đại từ ("để em làm") **không** đưa vào danh sách nhận tên; trưởng nhóm chọn người ở màn hình duyệt.
 - Trưởng nhóm vẫn có thể **gán thẳng** tên cho một thành viên lúc duyệt.
 - Hệ thống có thể **gợi ý** "Bạn có phải là Lan trong cuộc họp 17/11?" khi tên tài khoản gần giống, nhưng **không bao giờ tự nhận thay**.
+
+---
+
+## 16. Quyết định cho Giai đoạn 5 (17/11/2026)
+
+| Tình huống | Quyết định |
+|---|---|
+| Ai được duyệt + đẩy lên bảng | **Trưởng nhóm + người tải cuộc họp lên**. Thành viên khác chỉ xem |
+| Việc chưa có người làm (đại từ tự nhận, "cả nhóm") | **Cho đẩy**, thẻ để trống người làm |
+| Hạn "ước lượng" / không thấy câu gốc | **Chỉ tô màu cảnh báo**, không chặn |
+| Sau khi đẩy có tóm tắt lại được không | **Có, và đẩy thêm được**. Việc đã đẩy được giữ lại; việc mới trùng thì gắn "đã có trên bảng" + **bỏ tick sẵn** |
+| Việc bị bỏ tick lúc đẩy | Đánh dấu **"đã bỏ"**, vẫn xem được, tick lại rồi đẩy lần sau |
+| Bảng đích | **Chọn bảng lúc duyệt** (mặc định bảng đầu tiên), thẻ vào **cột đầu tiên** |
+| F20 với thẻ tạo tay | **Có**: chọn thành viên hoặc gõ tên |
+| Gộp tên chờ nhận | Bỏ xưng hô + không phân biệt hoa/thường, **giữ dấu** ("Năm" ≠ "Nam") |
+| Thông báo khi nhận tên | **Một thông báo tổng** cho người nhận; trưởng nhóm 1 thông báo kèm nút Hoàn tác |
+| F18 / F19 | Làm **phần truy vết F18**; **F19 (xuất PDF/Word) để sau** |
+| *(18/11, sau khi dùng thử)* Ai thấy danh sách "Tên chưa có người nhận" | Thành viên **chưa nhận tên** nào. Đã nhận một tên (chưa bị hoàn tác) thì **ẩn hẳn danh sách**; bị hoàn tác thì thấy lại. Thay cho quyết định "mọi thành viên đều thấy" ở mục 15 |
+| *(18/11, sau khi dùng thử)* Ai được kéo thả / sửa / xóa thẻ | **Người làm + người tạo thẻ + trưởng nhóm**. Thành viên khác chỉ xem và bình luận. Thẻ chưa có người làm / giao theo tên chữ: người tạo + trưởng nhóm. Thay cho thiết kế "ai cũng sửa được" của GĐ2 |
+
+Chi tiết và lý do: `docs/GIAI_THICH_GIAI_DOAN_5.md`.

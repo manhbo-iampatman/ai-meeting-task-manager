@@ -37,6 +37,8 @@ class TaskCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     description: str | None = None
     assignee_id: int | None = None
+    # F20: giao theo tên khi người đó chưa có tài khoản. Bị bỏ qua nếu đã có assignee_id.
+    assignee_name: str | None = Field(default=None, max_length=100)
     due_date: date | None = None
     priority: Priority = "medium"
 
@@ -47,6 +49,7 @@ class TaskUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
     assignee_id: int | None = None
+    assignee_name: str | None = Field(default=None, max_length=100)  # F20
     due_date: date | None = None
     priority: Priority | None = None
 
@@ -65,6 +68,8 @@ class TaskOut(ORMModel):
     title: str
     description: str | None
     assignee: UserBrief | None
+    assignee_name: str | None = None  # F20: người làm chưa có tài khoản
+    meeting_id: int | None = None  # F18: thẻ tạo từ cuộc họp nào
     due_date: date | None
     priority: str
     position: float
@@ -86,6 +91,7 @@ class BoardDetail(BaseModel):
     id: int
     workspace_id: int
     workspace_name: str
+    owner_id: int | None = None  # trưởng nhóm — được kéo / sửa / xóa mọi thẻ
     name: str
     columns: list[ColumnOut]
     members: list[UserBrief]
@@ -106,9 +112,20 @@ class CommentOut(ORMModel):
     created_at: datetime
 
 
+class TaskSource(BaseModel):
+    """F18: thẻ này sinh ra từ cuộc họp nào, từ câu nói nào."""
+
+    meeting_id: int
+    meeting_title: str
+    meeting_date: date
+    evidence_quote: str | None = None
+    evidence_start: float | None = None  # giây trong ghi âm → bấm nghe lại
+
+
 class TaskDetail(TaskOut):
     comments: list[CommentOut] = []
     column_name: str = ""
+    source: TaskSource | None = None
 
 
 class MyTaskOut(TaskOut):

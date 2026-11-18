@@ -53,6 +53,7 @@ def build_board_detail(db: DB, board: Board) -> BoardDetail:
         id=board.id,
         workspace_id=board.workspace_id,
         workspace_name=ws.name if ws else "",
+        owner_id=ws.owner_id if ws else None,
         name=board.name,
         columns=[
             ColumnOut(id=c.id, name=c.name, position=c.position, is_done=c.is_done, tasks=by_col[c.id])

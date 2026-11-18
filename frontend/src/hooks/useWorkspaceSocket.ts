@@ -24,6 +24,13 @@ export function useWorkspaceSocket(workspaceId: number | undefined) {
       qc.invalidateQueries({ queryKey: ['meetings', workspaceId] })
       return
     }
+    if (msg.type === 'names_updated') {
+      // F21: có người nhận tên / hoàn tác / thêm việc giao theo tên → tải lại danh sách + đầu việc nháp
+      qc.invalidateQueries({ queryKey: ['pending-names', workspaceId] })
+      qc.invalidateQueries({ queryKey: ['workspace', workspaceId] })
+      qc.invalidateQueries({ queryKey: ['meeting'] })
+      return
+    }
     if (msg.type !== 'meeting_updated') return
 
     const patch = (m: Meeting) =>

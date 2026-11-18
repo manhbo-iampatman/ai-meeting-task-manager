@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   deleteMeeting,
   getMeeting,
+  getWorkspace,
   meetingAudioUrl,
   retryMeeting,
   summarizeMeeting,
@@ -132,6 +133,12 @@ export default function MeetingPage() {
     refetchInterval: (q) => (q.state.data && PROCESSING.has(q.state.data.status) ? 5000 : false),
   })
   const live = useWorkspaceSocket(m?.workspace_id)
+  // Thành viên + bảng của nhóm: để chọn người làm và chọn bảng khi duyệt đầu việc (GĐ5)
+  const { data: ws } = useQuery({
+    queryKey: ['workspace', m?.workspace_id],
+    queryFn: () => getWorkspace(m!.workspace_id),
+    enabled: !!m?.can_review,
+  })
 
   const setData = (d: MeetingDetail) => {
     qc.setQueryData(['meeting', id], d)
@@ -231,7 +238,13 @@ export default function MeetingPage() {
           {m.summary && !transcribing && (
             <>
               <SummaryView summary={m.summary} />
-              <ExtractedTasksView tasks={m.extracted_tasks} audioRef={audioRef} hasAudio={m.has_audio} />
+              <ExtractedTasksView
+                meeting={m}
+                members={ws?.members.map((x) => x.user) ?? []}
+                boards={ws?.boards ?? []}
+                audioRef={audioRef}
+                onChange={setData}
+              />
             </>
           )}
 
@@ -308,7 +321,12 @@ export default function MeetingPage() {
               <p className="mt-1 text-indigo-900/70">
                 {m.summary ? (
                   <>
-                    Đã có biên bản và <b>{m.extracted_tasks.length} đầu việc nháp</b>. Sửa bản ghi rồi tóm tắt lại nếu thấy AI hiểu sai.
+                    Đã có biên bản,{' '}
+                    <b>{m.extracted_tasks.filter((t) => t.status !== 'accepted').length} đầu việc chờ duyệt</b>
+                    {m.extracted_tasks.some((t) => t.status === 'accepted') && (
+                      <> và {m.extracted_tasks.filter((t) => t.status === 'accepted').length} việc đã lên bảng</>
+                    )}
+                    . Sửa bản ghi rồi tóm tắt lại nếu thấy AI hiểu sai.
                   </>
                 ) : (
                   <>
@@ -322,7 +340,14 @@ export default function MeetingPage() {
                 variant={m.summary ? 'secondary' : 'primary'}
                 disabled={processing || summarize.isPending}
                 onClick={() => {
-                  if (m.summary && !confirm('Tóm tắt lại? Biên bản và các đầu việc nháp hiện tại sẽ được thay bằng kết quả mới.')) return
+                  if (
+                    m.summary &&
+                    !confirm(
+                      'Tóm tắt lại? Biên bản và các đầu việc CHƯA đẩy sẽ được thay bằng kết quả mới. ' +
+                        'Việc đã lên bảng được giữ nguyên; việc mới trùng với chúng sẽ được bỏ tick sẵn.',
+                    )
+                  )
+                    return
                   summarize.mutate()
                 }}
               >

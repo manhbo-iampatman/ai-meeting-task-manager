@@ -13,14 +13,16 @@ from app.models.user import User
 class MeetingStatus:
     """Vòng đời của một cuộc họp trong hệ thống.
 
-    uploaded ──► queued ──► transcribing ──► transcribed ──► summarizing ──► review ──► (GĐ5) done
-                                   │                 ▲            │
-                                   │                 └── lỗi LLM ─┘  (bản ghi vẫn còn, bấm tóm tắt lại)
+    uploaded ──► queued ──► transcribing ──► transcribed ──► summarizing ──► review ──► done
+                                   │                 ▲            │                ▲         │
+                                   │                 └── lỗi LLM ─┘                └─────────┘
+                                   │                                    tóm tắt lại sau khi đã đẩy
                                    └──► failed (lỗi: file hỏng, hết bộ nhớ GPU...) → có thể "Thử lại"
     Nếu người dùng dán sẵn văn bản thì đi thẳng tới `transcribed`.
 
     - summarizing: LLM đang đọc bản ghi để tóm tắt và tách đầu việc (Giai đoạn 4).
     - review: đã có biên bản + đầu việc NHÁP, chờ người dùng duyệt (Giai đoạn 5).
+    - done: đã đẩy đầu việc lên bảng. Vẫn tóm tắt lại / đẩy thêm được.
     """
 
     UPLOADED = "uploaded"
@@ -29,6 +31,7 @@ class MeetingStatus:
     TRANSCRIBED = "transcribed"
     SUMMARIZING = "summarizing"
     REVIEW = "review"
+    DONE = "done"
     FAILED = "failed"
 
     PROCESSING = {QUEUED, TRANSCRIBING, SUMMARIZING}
@@ -116,8 +119,8 @@ class MeetingSummary(Base):
 
 class ExtractedTaskStatus:
     PENDING = "pending"  # nháp, chờ duyệt
-    ACCEPTED = "accepted"  # đã đẩy lên bảng (Giai đoạn 5)
-    REJECTED = "rejected"  # người dùng bỏ
+    ACCEPTED = "accepted"  # đã đẩy lên bảng (thành thẻ `task_id`)
+    REJECTED = "rejected"  # bị bỏ tick lúc đẩy — vẫn xem được, tick lại rồi đẩy lần sau
 
 
 class ExtractedTask(Base):
@@ -142,6 +145,8 @@ class ExtractedTask(Base):
     assignee_score: Mapped[int] = mapped_column(Integer, default=0)
     # Khi ambiguous (2 thành viên trùng tên): id các tài khoản có thể đúng, để gợi ý lúc duyệt
     assignee_candidates: Mapped[list[int]] = mapped_column(JSONB, default=list)
+    # F20: tên dạng chữ dùng khi đẩy lên bảng nếu chưa chọn được tài khoản ("Duy" chưa đăng ký)
+    assignee_name: Mapped[str | None] = mapped_column(String(100))
 
     # --- Hạn chót (F16) ---
     due_text: Mapped[str | None] = mapped_column(String(200))  # nguyên văn: "thứ Sáu tuần này"
@@ -157,7 +162,13 @@ class ExtractedTask(Base):
     evidence_start: Mapped[float | None] = mapped_column(Float)  # giây, để nghe lại đúng câu
 
     status: Mapped[str] = mapped_column(String(10), default=ExtractedTaskStatus.PENDING)
+    # --- Duyệt (Giai đoạn 5) ---
+    selected: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")  # có tick "đưa lên bảng" không
+    task_id: Mapped[int | None] = mapped_column(ForeignKey("tasks.id", ondelete="SET NULL"))  # thẻ đã tạo
+    # Tóm tắt lại sau khi đã đẩy: việc này giống một thẻ đã có trên bảng → bỏ tick sẵn
+    duplicate_of_task_id: Mapped[int | None] = mapped_column(ForeignKey("tasks.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     meeting: Mapped[Meeting] = relationship(back_populates="extracted_tasks")
     assignee: Mapped[User | None] = relationship(lazy="joined")
+    task: Mapped["Task | None"] = relationship(foreign_keys=[task_id])  # noqa: F821 — app.models.board

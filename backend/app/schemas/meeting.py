@@ -1,6 +1,8 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field
+from typing import Literal
+
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.common import ORMModel, UserBrief
 
@@ -85,6 +87,36 @@ class ExtractedTaskOut(ORMModel):
     evidence_segment: int | None
     evidence_start: float | None
     status: str
+    # --- Duyệt (Giai đoạn 5) ---
+    assignee_name: str | None  # F20: tên dạng chữ khi chưa có tài khoản
+    selected: bool  # có tick "đưa lên bảng" không
+    task_id: int | None  # thẻ đã tạo trên bảng (khi status = accepted)
+    task_board_id: int | None = None  # bảng chứa thẻ đó (để mở thẻ)
+    duplicate_of_task_id: int | None  # giống một thẻ đã đẩy từ cuộc họp này
+
+
+class ExtractedTaskUpdate(BaseModel):
+    """Người duyệt sửa đầu việc nháp. Chỉ trường được gửi lên mới bị sửa.
+
+    Người làm: gửi `assignee_id` (thành viên) HOẶC `assignee_name` (tên chữ, F20); gửi cả hai
+    là null = chưa có người làm.
+    """
+
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    assignee_id: int | None = None
+    assignee_name: str | None = Field(default=None, max_length=100)
+    due_date: date | None = None
+    priority: Literal["low", "medium", "high"] | None = None
+    selected: bool | None = None
+
+    @field_validator("title", "assignee_name")
+    @classmethod
+    def _strip(cls, v: str | None) -> str | None:
+        return v.strip() if v is not None else None
+
+
+class PushIn(BaseModel):
+    board_id: int
 
 
 class MeetingDetail(MeetingOut):
@@ -92,3 +124,4 @@ class MeetingDetail(MeetingOut):
     transcript: TranscriptOut | None = None
     summary: SummaryOut | None = None
     extracted_tasks: list[ExtractedTaskOut] = []
+    can_review: bool = False  # người đang xem có được duyệt + đẩy lên bảng không

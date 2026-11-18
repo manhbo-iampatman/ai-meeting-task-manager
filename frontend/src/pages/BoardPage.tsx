@@ -46,7 +46,7 @@ export default function BoardPage() {
     return (t: Task) => {
       if (q && !t.title.toLowerCase().includes(q) && !(t.description ?? '').toLowerCase().includes(q)) return false
       if (filters.assignee === 'me' && t.assignee?.id !== me.id) return false
-      if (filters.assignee === 'none' && t.assignee) return false
+      if (filters.assignee === 'none' && (t.assignee || t.assignee_name)) return false
       if (/^\d+$/.test(filters.assignee) && t.assignee?.id !== Number(filters.assignee)) return false
       if (filters.priority && t.priority !== filters.priority) return false
       const ds = dueState(t.due_date)

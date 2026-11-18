@@ -87,6 +87,25 @@ def get_task_for_member(db: Session, task_id: int, user: User) -> tuple[Task, Bo
     return task, board
 
 
+def can_edit_task(db: Session, task: Task, board: Board, user: User) -> bool:
+    """Ai được kéo thả / sửa / xóa thẻ: người làm, người tạo thẻ, trưởng nhóm (quyết định 18/11/2026).
+
+    Thẻ chưa có người làm hoặc giao theo tên chữ → chỉ người tạo thẻ + trưởng nhóm.
+    Thành viên khác vẫn xem và bình luận được.
+    """
+    if user.id in (task.assignee_id, task.created_by):
+        return True
+    ws = db.get(Workspace, board.workspace_id)
+    return ws is not None and ws.owner_id == user.id
+
+
+def require_task_editor(db: Session, task: Task, board: Board, user: User) -> None:
+    if not can_edit_task(db, task, board, user):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Chỉ người làm, người tạo thẻ hoặc trưởng nhóm được thay đổi thẻ này"
+        )
+
+
 def ensure_member_user(db: Session, workspace_id: int, user_id: int | None) -> None:
     """Người được giao việc phải là thành viên của nhóm."""
     if user_id is None:

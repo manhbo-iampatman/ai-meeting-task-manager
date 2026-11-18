@@ -44,6 +44,11 @@ class Task(TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text)
     assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
+    # F20: giao theo TÊN khi người đó chưa có tài khoản ("Duy", "Su"...). Chỉ dùng khi assignee_id trống.
+    # Người đó vào nhóm rồi bấm nhận tên (F21) → chuyển sang assignee_id.
+    assignee_name: Mapped[str | None] = mapped_column(String(100))
+    # F18: thẻ được tạo từ cuộc họp nào (None = tạo tay trên bảng)
+    meeting_id: Mapped[int | None] = mapped_column(ForeignKey("meetings.id", ondelete="SET NULL"), index=True)
     due_date: Mapped[date | None] = mapped_column(Date)
     priority: Mapped[str] = mapped_column(String(10), default="medium")  # low | medium | high
     # Thứ tự trong cột, dùng số thực để chèn vào giữa 2 thẻ mà không phải đánh số lại cả cột

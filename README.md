@@ -7,6 +7,7 @@
 - Giải thích kiến thức Giai đoạn 2: [docs/GIAI_THICH_GIAI_DOAN_2.md](docs/GIAI_THICH_GIAI_DOAN_2.md)
 - Giải thích kiến thức Giai đoạn 3: [docs/GIAI_THICH_GIAI_DOAN_3.md](docs/GIAI_THICH_GIAI_DOAN_3.md)
 - Giải thích kiến thức Giai đoạn 4: [docs/GIAI_THICH_GIAI_DOAN_4.md](docs/GIAI_THICH_GIAI_DOAN_4.md)
+- Giải thích kiến thức Giai đoạn 5: [docs/GIAI_THICH_GIAI_DOAN_5.md](docs/GIAI_THICH_GIAI_DOAN_5.md)
 
 ## Cấu trúc
 
@@ -72,6 +73,12 @@ Mở một cuộc họp đã có bản ghi rồi bấm **"✨ Tóm tắt & tạo
 | `OLLAMA_MODEL` | Mô hình Ollama, mặc định `qwen2.5:3b` (cài Ollama rồi chạy `ollama pull qwen2.5:3b`) |
 
 Đổi `.env` xong phải **khởi động lại Worker AI**.
+
+## Duyệt & đẩy lên bảng (Giai đoạn 5)
+
+- Trưởng nhóm hoặc người tải cuộc họp lên: mục **"Duyệt đầu việc"** trên trang cuộc họp → sửa, bỏ tick → **"⬆ Đẩy N việc lên bảng"**.
+- Người chưa có tài khoản được giao **theo tên** ("Duy", "Su"). Tên đó hiện ở mục **"Tên chưa có người nhận"** trên trang nhóm; người đó vào nhóm bằng link mời rồi bấm **"Đây là tôi"**. Trưởng nhóm được báo và có thể hoàn tác.
+- Lấy code mới xong: `alembic upgrade head` rồi khởi động lại API + Worker AI.
 
 ## Kiểm tra nhanh
 

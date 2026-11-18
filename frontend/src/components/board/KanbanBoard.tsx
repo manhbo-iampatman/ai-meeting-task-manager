@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { canEditTask } from '../../lib/permissions'
+import { useAuth } from '../../stores/auth'
 import {
   closestCorners,
   DndContext,
@@ -45,6 +47,8 @@ export default function KanbanBoard({
   onOpenTask: (id: number) => void
 }) {
   const qc = useQueryClient()
+  const me = useAuth((s) => s.user)!
+  const canEdit = (t: Task) => canEditTask(t, board.owner_id, me.id)
   const [items, setItems] = useState<Items>(() => buildItems(board))
   const [active, setActive] = useState<Task | null>(null)
   const origin = useRef<{ col: string; index: number } | null>(null)
@@ -161,6 +165,7 @@ export default function KanbanBoard({
               tasks={filterFn ? all.filter(filterFn) : all}
               totalCount={all.length}
               dragDisabled={dragDisabled}
+              canEdit={canEdit}
               onOpenTask={onOpenTask}
             />
           )

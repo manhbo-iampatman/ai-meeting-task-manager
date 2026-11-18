@@ -73,7 +73,7 @@ Ký hiệu: ✅ đã làm xong · 🔜 đang / sắp làm · 💡 mở rộng n�
 | F03 | Tạo nhóm, mời thành viên bằng link / email, phân quyền trưởng nhóm – thành viên, **biệt danh** thành viên | ✅ |
 | F04 | Nhiều bảng công việc mỗi nhóm, cột tùy chỉnh (mặc định Cần làm / Đang làm / Hoàn thành) | ✅ |
 | F05 | Thẻ công việc: người làm, hạn chót, mức ưu tiên, mô tả, bình luận | ✅ |
-| F06 | **Kéo-thả** thẻ giữa các cột, **cập nhật realtime** cho mọi thành viên | ✅ |
+| F06 | **Kéo-thả** thẻ giữa các cột, **cập nhật realtime** cho mọi thành viên. Chỉ người làm, người tạo thẻ, trưởng nhóm được kéo / sửa / xóa (từ 18/11/2026) | ✅ |
 | F07 | Lọc / tìm kiếm, trang **"Việc của tôi"** | ✅ |
 | F08 | Thông báo: được giao việc, sắp đến hạn, quá hạn | ✅ |
 
@@ -88,15 +88,15 @@ Ký hiệu: ✅ đã làm xong · 🔜 đang / sắp làm · 💡 mở rộng n�
 | F14 | **Trích xuất đầu việc**: Ai làm – Làm gì – Hạn chót, kèm trích dẫn câu gốc (**được kiểm tra lại bằng code**) | ✅ |
 | F15 | Ghép tên trong cuộc họp với tài khoản thành viên (qua biệt danh, so khớp mờ) | ✅ |
 | F16 | Đổi ngày tương đối ("thứ Sáu tuần sau") thành ngày cụ thể, tính theo ngày họp | ✅ |
-| F17 | **Màn hình duyệt** + nút **"Đẩy lên bảng"** | 🔜 Giai đoạn 5 |
-| F18 | Lịch sử cuộc họp, truy vết thẻ được tạo từ cuộc họp nào | 🔜 Giai đoạn 5 |
+| F17 | **Màn hình duyệt** + nút **"Đẩy lên bảng"** (một transaction; tóm tắt lại vẫn đẩy thêm được, việc trùng bỏ tick sẵn) | ✅ |
+| F18 | Lịch sử cuộc họp, truy vết thẻ được tạo từ cuộc họp nào | ✅ phần truy vết (thẻ ↔ cuộc họp + câu gốc) |
 | F19 | Xuất biên bản PDF / Word | 🔜 Giai đoạn 5 |
 
 ### 5.3. Thông báo & mời thành viên (đã chốt bổ sung)
 | Mã | Chức năng | Trạng thái |
 |---|---|---|
-| F20 | Giao việc theo **tên** khi người đó chưa có tài khoản | 🔜 |
-| F21 | **Tự nhận tên**: tên AI nghe được mà chưa khớp tài khoản (kể cả biệt danh) hiện thành danh sách; người đó vào nhóm và **bấm nhận tên của mình** để nhận việc. Trưởng nhóm được báo và có thể hoàn tác | 🔜 |
+| F20 | Giao việc theo **tên** khi người đó chưa có tài khoản (cả thẻ từ cuộc họp lẫn thẻ tạo tay) | ✅ |
+| F21 | **Tự nhận tên**: tên AI nghe được mà chưa khớp tài khoản (kể cả biệt danh) hiện thành danh sách; người đó vào nhóm và **bấm nhận tên của mình** để nhận việc. Trưởng nhóm được báo và có thể hoàn tác. Tên vừa nhận thành **biệt danh** → cuộc họp sau AI tự ghép đúng | ✅ |
 | F22 | Nút **"Sao chép tin nhắn"** kết quả cuộc họp để dán vào Zalo / Messenger | 🔜 |
 | F23 | **Email** báo việc mới (mỗi người chỉ nhận việc của mình) | 🔜 |
 | F24 | Thông báo **"Duy đã hoàn thành…"** cho người giao việc | 🔜 |
@@ -136,7 +136,7 @@ Ký hiệu: ✅ đã làm xong · 🔜 đang / sắp làm · 💡 mở rộng n�
 | Chống AI bịa chữ | Chặn được các câu ảo giác kiểu *"Hãy subscribe cho kênh…"*; file nhạc / không có lời nói được báo lỗi rõ ràng |
 | Trích xuất đầu việc (cuộc họp mẫu, Gemini) | **4/4 đầu việc**, đúng hạn chót 4/4, câu gốc tìm thấy 4/4; 1 việc người nói tự nhận được cố ý để trống người làm |
 | Thời gian tóm tắt | Khoảng **11–19 giây** cho cuộc họp 85 giây |
-| Kiểm thử tự động | 129 test |
+| Kiểm thử tự động | 143 test |
 
 ## 8. Điểm nhấn khi bảo vệ
 

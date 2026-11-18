@@ -8,13 +8,21 @@ import time
 
 from sqlalchemy import func, select
 
-from app.ai.extraction import extract_meeting
+from app.ai.extraction import extract_meeting, same_task
 from app.ai.llm import LLMError, get_llm_provider
-from app.ai.postprocess.name_matching import MemberInfo
+from app.ai.postprocess.name_matching import MemberInfo, name_key
 from app.ai.stt import get_stt_provider
 from app.core.config import get_settings
 from app.core.database import SessionLocal
-from app.models import ExtractedTask, Meeting, MeetingStatus, MeetingSummary, Transcript, WorkspaceMember
+from app.models import (
+    ExtractedTask,
+    ExtractedTaskStatus,
+    Meeting,
+    MeetingStatus,
+    MeetingSummary,
+    Transcript,
+    WorkspaceMember,
+)
 from app.services.meeting_service import audio_abspath, fix_webm_duration, notify_meeting
 
 log = logging.getLogger(__name__)
@@ -140,6 +148,44 @@ def workspace_members(db, workspace_id: int) -> list[MemberInfo]:
     return [MemberInfo(user_id=m.user_id, full_name=m.user.full_name, nicknames=list(m.nicknames or [])) for m in members]
 
 
+# Kết quả ghép tên mà KHÔNG có tên riêng để giao theo tên chữ (F20): đại từ tự nhận, "cả nhóm"
+_NO_NAME_MATCHES = {"self", "group"}
+
+
+def _who(assignee_id: int | None, name: str | None) -> tuple[str, object] | None:
+    """Người làm của một đầu việc, để so trùng: theo tài khoản nếu có, không thì theo tên chữ."""
+    if assignee_id is not None:
+        return ("id", assignee_id)
+    key = name_key(name)
+    return ("name", key) if key else None
+
+
+def _find_pushed_duplicate(title: str, who: tuple[str, object] | None, pushed: list[ExtractedTask]) -> int | None:
+    """Tóm tắt lại sau khi đã đẩy lên bảng: việc mới có trùng một thẻ đã tạo từ cuộc họp này không?
+
+    Trùng = cùng việc (`same_task` của GĐ4) và cùng người làm. Việc mới không rõ người làm
+    (vd. "anh" tự nhận) mà trùng nội dung thì cũng coi là trùng — người duyệt đã chọn người lúc đẩy.
+    """
+    for d in pushed:
+        if d.task_id is None:  # thẻ đã bị xóa khỏi bảng → không còn "trên bảng"
+            continue
+        if not same_task(d.title, title):
+            continue
+        if who is None or who == _who(d.assignee_id, d.assignee_name or d.raw_assignee):
+            return d.task_id
+    return None
+
+
+def status_after_ai(m: Meeting) -> str:
+    """Trạng thái hợp lý khi không có job nào đang chạy (dùng khi tóm tắt lỗi)."""
+    if m.summary is None:
+        return MeetingStatus.TRANSCRIBED
+    drafts = m.extracted_tasks
+    has_pending = any(d.status == ExtractedTaskStatus.PENDING for d in drafts)
+    has_pushed = any(d.status == ExtractedTaskStatus.ACCEPTED for d in drafts)
+    return MeetingStatus.DONE if has_pushed and not has_pending else MeetingStatus.REVIEW
+
+
 def summarize_meeting_job(meeting_id: int) -> dict:
     """Giai đoạn 4: gọi LLM tóm tắt bản ghi + trích xuất đầu việc, rồi lưu thành BẢN NHÁP chờ duyệt.
 
@@ -175,8 +221,8 @@ def summarize_meeting_job(meeting_id: int) -> dict:
             mm = db.get(Meeting, meeting_id)
             if mm is None:
                 return {"skipped": True}
-            # Còn biên bản cũ thì vẫn ở bước duyệt; chưa có thì quay về "đã có bản ghi"
-            mm.status = MeetingStatus.REVIEW if mm.summary else MeetingStatus.TRANSCRIBED
+            # Còn biên bản cũ thì vẫn ở bước duyệt / hoàn tất; chưa có thì quay về "đã có bản ghi"
+            mm.status = status_after_ai(mm)
             mm.progress = 100
             mm.error = message
             mm.status_note = None
@@ -218,13 +264,23 @@ def summarize_meeting_job(meeting_id: int) -> dict:
         sm.created_at = func.now()  # tóm tắt lại → tính là biên bản mới
         db.add(sm)
 
-        # Thay toàn bộ đầu việc nháp cũ bằng kết quả mới
-        db.query(ExtractedTask).filter(ExtractedTask.meeting_id == m.id).delete()
-        for pos, it in enumerate(result.items):
+        # Thay đầu việc NHÁP cũ bằng kết quả mới. Đầu việc ĐÃ ĐẨY lên bảng được giữ lại (truy vết F18).
+        pushed = [d for d in m.extracted_tasks if d.status == ExtractedTaskStatus.ACCEPTED]
+        db.query(ExtractedTask).filter(
+            ExtractedTask.meeting_id == m.id, ExtractedTask.status != ExtractedTaskStatus.ACCEPTED
+        ).delete()
+        start = max((d.position for d in pushed), default=-1) + 1
+        for pos, it in enumerate(result.items, start=start):
+            # F20: tên chưa khớp tài khoản nào → giữ làm tên dạng chữ để vẫn đẩy được lên bảng
+            name = it.raw_assignee if it.assignee_id is None and it.assignee_match not in _NO_NAME_MATCHES else None
+            dup = _find_pushed_duplicate(it.title, _who(it.assignee_id, name), pushed)
             db.add(
                 ExtractedTask(
                     meeting_id=m.id,
                     position=pos,
+                    assignee_name=name,
+                    selected=dup is None,  # đã có trên bảng → bỏ tick sẵn
+                    duplicate_of_task_id=dup,
                     title=it.title,
                     raw_assignee=it.raw_assignee,
                     assignee_id=it.assignee_id,

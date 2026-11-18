@@ -65,6 +65,7 @@ export default function KanbanColumn({
   column,
   tasks,
   dragDisabled,
+  canEdit,
   totalCount,
   onOpenTask,
 }: {
@@ -72,6 +73,8 @@ export default function KanbanColumn({
   column: Column
   tasks: Task[]
   dragDisabled: boolean
+  /** Người đang xem có được kéo thẻ này không (người làm / người tạo / trưởng nhóm) */
+  canEdit: (t: Task) => boolean
   totalCount: number
   onOpenTask: (id: number) => void
 }) {
@@ -134,7 +137,14 @@ export default function KanbanColumn({
       <div ref={setNodeRef} className={`min-h-16 flex-1 space-y-2 overflow-y-auto px-2 pb-2 ${isOver ? 'rounded-lg bg-indigo-50' : ''}`}>
         <SortableContext items={tasks.map((t) => `t-${t.id}`)} strategy={verticalListSortingStrategy}>
           {tasks.map((t) => (
-            <TaskCard key={t.id} task={t} done={column.is_done} disabled={dragDisabled} onOpen={onOpenTask} />
+            <TaskCard
+              key={t.id}
+              task={t}
+              done={column.is_done}
+              disabled={dragDisabled || !canEdit(t)}
+              locked={!canEdit(t)}
+              onOpen={onOpenTask}
+            />
           ))}
         </SortableContext>
       </div>

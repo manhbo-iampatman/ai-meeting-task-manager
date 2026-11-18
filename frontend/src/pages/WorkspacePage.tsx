@@ -14,6 +14,7 @@ import {
 import type { Member, WorkspaceDetail } from '../api/types'
 import Avatar from '../components/Avatar'
 import MeetingsSection from '../components/meeting/MeetingsSection'
+import PendingNamesSection from '../components/PendingNamesSection'
 import { Button, ErrorText, Input, Spinner } from '../components/ui'
 import { errorMessage } from '../lib/utils'
 import { useAuth } from '../stores/auth'
@@ -147,6 +148,7 @@ export default function WorkspacePage() {
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_380px]">
         {/* ---- Bảng công việc ---- */}
         <section>
+          <PendingNamesSection workspaceId={ws.id} />
           <h2 className="mb-3 font-semibold">Bảng công việc</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {ws.boards.map((b) => (

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.realtime import publish_event, workspace_room
-from app.models import ExtractedTask, Meeting, MeetingStatus, MeetingSummary, Transcript
+from app.models import ExtractedTask, ExtractedTaskStatus, Meeting, MeetingStatus, MeetingSummary, Transcript
 
 log = logging.getLogger(__name__)
 
@@ -188,7 +188,12 @@ def enqueue_summarization(meeting: Meeting) -> None:
 
 
 def clear_ai_results(db: Session, meeting: Meeting) -> None:
-    """Xóa biên bản + đầu việc nháp (khi nhận dạng lại giọng nói → bản ghi cũ không còn đúng)."""
-    db.query(ExtractedTask).filter(ExtractedTask.meeting_id == meeting.id).delete()
+    """Xóa biên bản + đầu việc nháp (khi nhận dạng lại giọng nói → bản ghi cũ không còn đúng).
+
+    Đầu việc ĐÃ ĐẨY lên bảng được giữ lại: thẻ trên bảng vẫn còn, cần truy vết được nguồn gốc (F18).
+    """
+    db.query(ExtractedTask).filter(
+        ExtractedTask.meeting_id == meeting.id, ExtractedTask.status != ExtractedTaskStatus.ACCEPTED
+    ).delete()
     db.query(MeetingSummary).filter(MeetingSummary.meeting_id == meeting.id).delete()
     db.expire(meeting, ["summary", "extracted_tasks"])

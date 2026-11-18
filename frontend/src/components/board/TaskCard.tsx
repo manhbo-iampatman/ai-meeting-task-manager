@@ -1,6 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Task } from '../../api/types'
+import { NO_EDIT_REASON } from '../../lib/permissions'
 import { dueState, formatDate, PRIORITY } from '../../lib/utils'
 import Avatar from '../Avatar'
 
@@ -29,7 +30,25 @@ export function TaskCardView({ task, done, dragging = false }: { task: Task; don
           </span>
         )}
         {task.comment_count > 0 && <span className="text-[11px] text-slate-500">💬 {task.comment_count}</span>}
-        <span className="ml-auto">{task.assignee && <Avatar user={task.assignee} size="sm" />}</span>
+        {task.meeting_id && (
+          <span className="text-[11px] text-slate-400" title="Tạo từ cuộc họp">
+            🎙
+          </span>
+        )}
+        <span className="ml-auto">
+          {task.assignee ? (
+            <Avatar user={task.assignee} size="sm" />
+          ) : (
+            task.assignee_name && (
+              <span
+                className="inline-flex max-w-[8rem] items-center truncate rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-[11px] text-slate-600"
+                title={`${task.assignee_name} — chưa có tài khoản. Người này vào nhóm và nhận tên thì việc chuyển sang tài khoản của họ.`}
+              >
+                {task.assignee_name}
+              </span>
+            )
+          )}
+        </span>
       </div>
     </div>
   )
@@ -39,11 +58,14 @@ export default function TaskCard({
   task,
   done,
   disabled,
+  locked = false,
   onOpen,
 }: {
   task: Task
   done: boolean
   disabled: boolean
+  /** Không có quyền kéo / sửa thẻ này (chỉ xem + bình luận) */
+  locked?: boolean
   onOpen: (id: number) => void
 }) {
   // useSortable: biến thẻ thành phần tử kéo-thả được và sắp xếp được trong cột
@@ -56,6 +78,7 @@ export default function TaskCard({
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={`${isDragging ? 'opacity-30' : ''} ${disabled ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'}`}
+      title={locked ? NO_EDIT_REASON : undefined}
       onClick={() => onOpen(task.id)}
       {...attributes}
       {...listeners}

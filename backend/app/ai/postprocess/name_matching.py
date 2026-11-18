@@ -55,6 +55,22 @@ def strip_honorific(name: str) -> str:
     return " ".join(words)
 
 
+def display_name(name: str) -> str:
+    """"chị Lan" → "Lan" (bỏ xưng hô đứng đầu, GIỮ chữ hoa / dấu). "Anh" đứng một mình giữ nguyên."""
+    words = name.strip().split()
+    if len(words) > 1 and norm(words[0]) in HONORIFICS:
+        words = words[1:]
+    return " ".join(words)
+
+
+def name_key(name: str | None) -> str:
+    """Khóa để gộp các cách viết của CÙNG một tên chưa có người nhận (F20/F21).
+
+    "Lan", "lan", "chị Lan" → "lan". Vẫn GIỮ dấu: "Năm" và "Nam" là hai tên khác nhau.
+    """
+    return strip_honorific(name or "")
+
+
 def split_assignees(raw: str) -> list[str]:
     """"Lan và Minh" → ["Lan", "Minh"]. Mỗi người sẽ thành 1 đầu việc riêng."""
     parts = re.split(r"\s*(?:,|;|/|&|\+)\s*|\s+(?:và|với|cùng)\s+", raw.strip())

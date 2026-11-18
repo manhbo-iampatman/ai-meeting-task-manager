@@ -45,6 +45,10 @@ export type Task = {
   title: string
   description: string | null
   assignee: User | null
+  /** F20: người làm chưa có tài khoản, giao theo tên chữ ("Su"). Chỉ có khi `assignee` trống */
+  assignee_name: string | null
+  /** F18: thẻ được tạo từ cuộc họp nào (null = tạo tay) */
+  meeting_id: number | null
   due_date: string | null // "YYYY-MM-DD"
   priority: Priority
   position: number
@@ -66,6 +70,8 @@ export type BoardDetail = {
   id: number
   workspace_id: number
   workspace_name: string
+  /** Trưởng nhóm — được kéo / sửa / xóa mọi thẻ */
+  owner_id: number | null
   name: string
   columns: Column[]
   members: User[]
@@ -79,7 +85,16 @@ export type Comment = {
   created_at: string
 }
 
-export type TaskDetail = Task & { comments: Comment[]; column_name: string }
+/** F18: cuộc họp + câu nói đã sinh ra thẻ */
+export type TaskSource = {
+  meeting_id: number
+  meeting_title: string
+  meeting_date: string
+  evidence_quote: string | null
+  evidence_start: number | null
+}
+
+export type TaskDetail = Task & { comments: Comment[]; column_name: string; source: TaskSource | null }
 
 export type MyTask = Task & {
   board_name: string
@@ -91,24 +106,53 @@ export type MyTask = Task & {
 
 export type Notification = {
   id: number
-  type: 'task_assigned' | 'task_due_soon' | 'task_overdue'
+  type: 'task_assigned' | 'task_due_soon' | 'task_overdue' | 'name_claimed' | 'name_claimed_member' | 'name_claim_undone'
   payload: {
-    task_id: number
-    task_title: string
-    board_id: number
-    board_name: string
+    task_id?: number
+    task_title?: string
+    board_id?: number
+    board_name?: string
     workspace_id: number
     actor_name?: string
     due_date?: string | null
+    // F21: tự nhận tên
+    claim_id?: number
+    workspace_name?: string
+    name?: string
+    task_count?: number
+    draft_count?: number
+    claimer_name?: string
+    undone?: boolean
   }
   is_read: boolean
   created_at: string
 }
 
+// ---- F21: tên chưa có người nhận ----
+export type PendingName = {
+  key: string
+  name: string
+  variants: string[]
+  tasks: { id: number; title: string; board_id: number; board_name: string; due_date: string | null }[]
+  drafts: { id: number; title: string; meeting_id: number; meeting_title: string; status: 'pending' | 'rejected' }[]
+  /** Giống tên / biệt danh của người đang xem → gợi ý "Bạn có phải là … không?" */
+  suggested: boolean
+}
+
+export type NameClaim = { id: number; name: string; task_count: number; draft_count: number; added_nickname: string | null }
+
 export type NotificationList = { unread_count: number; items: Notification[] }
 
 // ---- Cuộc họp (Giai đoạn 3) ----
-export type MeetingStatus = 'uploaded' | 'queued' | 'transcribing' | 'transcribed' | 'summarizing' | 'review' | 'failed'
+export type MeetingStatus =
+  | 'uploaded'
+  | 'queued'
+  | 'transcribing'
+  | 'transcribed'
+  | 'summarizing'
+  | 'review'
+  | 'done'
+  | 'failed'
 
 export type Segment = { start: number | null; end: number | null; text: string }
 
@@ -158,8 +202,9 @@ export type MeetingSummary = {
   stale: boolean
 }
 
-/** Kết quả ghép tên: khớp hẳn / khớp khi bỏ dấu / gần giống / trùng nhiều người / người nói tự nhận / cả nhóm / không khớp */
-export type AssigneeMatch = 'exact' | 'no_accent' | 'fuzzy' | 'ambiguous' | 'self' | 'group' | 'none'
+/** Kết quả ghép tên: khớp hẳn / khớp khi bỏ dấu / gần giống / trùng nhiều người / người nói tự nhận / cả nhóm /
+ * không khớp / người duyệt tự chọn (GĐ5) / người đó tự nhận tên (F21) */
+export type AssigneeMatch = 'exact' | 'no_accent' | 'fuzzy' | 'ambiguous' | 'self' | 'group' | 'none' | 'manual' | 'claimed'
 
 export type ExtractedTask = {
   id: number
@@ -178,7 +223,25 @@ export type ExtractedTask = {
   evidence_found: boolean
   evidence_segment: number | null
   evidence_start: number | null
+  /** pending = chờ duyệt · accepted = đã lên bảng · rejected = bị bỏ tick lúc đẩy (vẫn đẩy lại được) */
   status: 'pending' | 'accepted' | 'rejected'
+  /** F20: tên chữ dùng khi đẩy lên bảng nếu chưa chọn tài khoản */
+  assignee_name: string | null
+  /** Có tick "đưa lên bảng" */
+  selected: boolean
+  task_id: number | null
+  task_board_id: number | null
+  /** Tóm tắt lại sau khi đã đẩy: giống một thẻ đã có trên bảng */
+  duplicate_of_task_id: number | null
+}
+
+export type DraftInput = {
+  title?: string
+  assignee_id?: number | null
+  assignee_name?: string | null
+  due_date?: string | null
+  priority?: Priority
+  selected?: boolean
 }
 
 export type MeetingDetail = Meeting & {
@@ -186,4 +249,6 @@ export type MeetingDetail = Meeting & {
   transcript: Transcript | null
   summary: MeetingSummary | null
   extracted_tasks: ExtractedTask[]
+  /** Người đang xem được duyệt + đẩy lên bảng (trưởng nhóm hoặc người tải cuộc họp lên) */
+  can_review: boolean
 }
