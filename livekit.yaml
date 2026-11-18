@@ -1,0 +1,19 @@
+# Cấu hình LiveKit — máy chủ phòng họp (WebRTC SFU) cho "Online Meeting" (Giai đoạn 6).
+# Chạy bằng Docker (xem docker-compose.yml). Khóa API và IP của máy KHÔNG ghi ở đây:
+# chúng đến từ file .env ở thư mục gốc do `scripts/setup_lan.py` tạo ra.
+
+port: 7880            # cổng "tín hiệu" (WebSocket). Trình duyệt đi qua Vite: wss://<máy>:5173/rtc
+
+rtc:
+  tcp_port: 7881      # hình / tiếng qua TCP (dự phòng khi mạng chặn UDP)
+  udp_port: 7882      # hình / tiếng qua UDP — mọi người dùng chung MỘT cổng (dễ mở tường lửa)
+  use_external_ip: false   # chỉ chạy trong LAN → không cần dò IP công khai (STUN)
+
+room:
+  auto_create: false       # chỉ backend MeetFlow được tạo phòng; vé hợp lệ mà phòng không có → từ chối
+  max_participants: 6
+  empty_timeout: 600       # phòng tạo ra mà 10 phút không ai vào → LiveKit tự đóng
+  departure_timeout: 300   # mọi người rời hết → LiveKit giữ phòng thêm 5 phút (MeetFlow tự đóng sớm hơn)
+
+logging:
+  level: info

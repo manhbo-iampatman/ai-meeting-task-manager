@@ -154,7 +154,16 @@ export type MeetingStatus =
   | 'done'
   | 'failed'
 
-export type Segment = { start: number | null; end: number | null; text: string }
+export type Segment = {
+  start: number | null
+  end: number | null
+  text: string
+  /** Online Meeting: họ tên người nói câu này (mỗi người ghi bằng mic của mình nên biết chắc) */
+  speaker?: string | null
+  speaker_id?: number | null
+  track_id?: number | null
+  rms?: number | null
+}
 
 export type Transcript = {
   full_text: string
@@ -172,7 +181,8 @@ export type Meeting = {
   workspace_id: number
   title: string
   meeting_date: string
-  source_type: 'audio' | 'recording' | 'text'
+  /** online = phòng họp trực tuyến "Online Meeting" (Giai đoạn 6) */
+  source_type: 'audio' | 'recording' | 'text' | 'online'
   status: MeetingStatus
   progress: number
   error: string | null
@@ -204,7 +214,18 @@ export type MeetingSummary = {
 
 /** Kết quả ghép tên: khớp hẳn / khớp khi bỏ dấu / gần giống / trùng nhiều người / người nói tự nhận / cả nhóm /
  * không khớp / người duyệt tự chọn (GĐ5) / người đó tự nhận tên (F21) */
-export type AssigneeMatch = 'exact' | 'no_accent' | 'fuzzy' | 'ambiguous' | 'self' | 'group' | 'none' | 'manual' | 'claimed'
+export type AssigneeMatch =
+  | 'exact'
+  | 'no_accent'
+  | 'fuzzy'
+  | 'ambiguous'
+  | 'self'
+  | 'group'
+  | 'none'
+  | 'manual'
+  | 'claimed'
+  /** Online Meeting: người nói tự nhận việc, biết chắc là ai nhờ ghi âm riêng */
+  | 'speaker'
 
 export type ExtractedTask = {
   id: number
@@ -251,4 +272,45 @@ export type MeetingDetail = Meeting & {
   extracted_tasks: ExtractedTask[]
   /** Người đang xem được duyệt + đẩy lên bảng (trưởng nhóm hoặc người tải cuộc họp lên) */
   can_review: boolean
+  /** Online Meeting: ghi âm của từng người */
+  tracks: MeetingTrack[]
+}
+
+// ---- Phòng họp trực tuyến "Online Meeting" (Giai đoạn 6) ----
+export type RecordingState = 'idle' | 'on' | 'stopped'
+
+export type Room = {
+  code: string
+  workspace_id: number
+  workspace_name: string
+  title: string
+  status: 'open' | 'ended'
+  /** Chủ phòng HIỆN TẠI (có thể đổi giữa buổi: chủ phòng rời / vắng quá 1 phút thì nhượng quyền) */
+  host: User | null
+  /** Trưởng nhóm — luôn điều khiển được phòng dù không phải chủ phòng */
+  owner_id: number | null
+  /** idle = chưa ghi · on = đang ghi · stopped = đã dừng (buổi đó không ghi lại được) */
+  recording: RecordingState
+  recording_started_at: string | null
+  /** Cuộc họp sinh ra sau khi phòng kết thúc (null = không ghi âm) */
+  meeting_id: number | null
+  created_at: string
+  is_member: boolean
+  is_host: boolean
+  /** Được bắt đầu / dừng ghi và kết thúc phòng: chủ phòng + trưởng nhóm */
+  can_control: boolean
+}
+
+export type RoomJoin = { room: Room; token: string; joined_workspace: boolean }
+
+export type MeetingTrack = {
+  id: number
+  user_id: number | null
+  speaker_name: string
+  /** Trình duyệt của người này đã gửi hết ghi âm chưa */
+  finished: boolean
+  has_audio: boolean
+  merged: boolean
+  /** Có ghi âm đến muộn đang chờ người duyệt bấm "Bổ sung" */
+  pending: boolean
 }

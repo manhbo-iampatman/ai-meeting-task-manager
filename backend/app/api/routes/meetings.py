@@ -12,7 +12,9 @@ from app.api.routes.boards import board_changed
 from app.core.database import SessionLocal
 from app.core.security import decode_access_token
 from app.core.realtime import publish_event, workspace_room
-from app.models import ExtractedTask, ExtractedTaskStatus, Meeting, MeetingStatus, User, WorkspaceMember
+from app.ai.postprocess import speaker_merge
+from app.models import ExtractedTask, ExtractedTaskStatus, Meeting, MeetingStatus, MeetingTrack, User, WorkspaceMember
+from app.schemas.room import MeetingTrackOut
 from app.schemas.meeting import (
     ExtractedTaskOut,
     ExtractedTaskUpdate,
@@ -70,8 +72,22 @@ def _draft_out(t: ExtractedTask) -> ExtractedTaskOut:
     return out
 
 
+def _track_out(t: MeetingTrack) -> MeetingTrackOut:
+    return MeetingTrackOut(
+        id=t.id,
+        user_id=t.user_id,
+        speaker_name=t.speaker_name,
+        finished=t.finished,
+        has_audio=t.size > 0,
+        merged=t.merged,
+        # Đã nhận dạng xong phần đến muộn nhưng chưa đưa vào bản ghi (bản ghi đã sửa tay / đã tóm tắt)
+        pending=bool(t.segments) and not t.merged and not t.has_new_audio,
+    )
+
+
 def _detail(m: Meeting, db: DB, user: User) -> MeetingDetail:
     return MeetingDetail(
+        tracks=[_track_out(t) for t in m.tracks] if m.source_type == "online" else [],
         **_out(m).model_dump(),
         has_audio=bool(m.audio_path),
         transcript=TranscriptOut.model_validate(m.transcript) if m.transcript else None,
@@ -187,7 +203,8 @@ def delete_meeting(meeting_id: int, user: CurrentUser, db: DB):
 def retry_meeting(meeting_id: int, user: CurrentUser, db: DB):
     """Chạy lại chuyển giọng nói (khi lỗi, hoặc muốn chạy lại sau khi đổi mô hình)."""
     m = _get_meeting(db, meeting_id, user)
-    if m.source_type == "text" or not m.audio_path:
+    has_audio = any(t.size > 0 for t in m.tracks) if m.source_type == "online" else bool(m.audio_path)
+    if m.source_type == "text" or not has_audio:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Cuộc họp này không có file ghi âm")
     if m.status in MeetingStatus.PROCESSING:
         raise HTTPException(status.HTTP_409_CONFLICT, "Cuộc họp đang được xử lý")
@@ -211,7 +228,7 @@ def update_transcript(meeting_id: int, data: TranscriptUpdate, user: CurrentUser
     for s in segments:
         s["text"] = s["text"].strip()
     m.transcript.segments = segments
-    m.transcript.full_text = ("\n" if m.source_type == "text" else " ").join(s["text"] for s in segments)
+    m.transcript.full_text = speaker_merge.full_text(segments) if m.source_type == "online" else ("\n" if m.source_type == "text" else " ").join(s["text"] for s in segments)
     m.transcript.edited = True
     db.commit()
     db.refresh(m)
@@ -235,6 +252,22 @@ def summarize_meeting(meeting_id: int, user: CurrentUser, db: DB):
     db.commit()
     db.refresh(m)
     svc.notify_meeting(m)
+    return _detail(m, db, user)
+
+
+@router.post("/meetings/{meeting_id}/tracks/{track_id}/merge", response_model=MeetingDetail)
+def merge_late_track(meeting_id: int, track_id: int, user: CurrentUser, db: DB):
+    """Online Meeting: ghi âm của một người về muộn, mà bản ghi đã bị sửa tay hoặc đã tóm tắt nên
+    hệ thống không tự ghi đè. Người duyệt bấm "Bổ sung" → lời của người đó được đưa vào bản ghi
+    (câu của người khác giữ nguyên)."""
+    m = _get_meeting(db, meeting_id, user)
+    review_service.require_reviewer(db, m, user)
+    track = db.get(MeetingTrack, track_id)
+    if track is None or track.meeting_id != m.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Không tìm thấy ghi âm này")
+    if m.status in MeetingStatus.PROCESSING:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Cuộc họp đang được xử lý")
+    svc.enqueue_late_track(track.id, force=True)
     return _detail(m, db, user)
 
 

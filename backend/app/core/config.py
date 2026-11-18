@@ -50,6 +50,19 @@ class Settings(BaseSettings):
     LLM_CHUNK_CHARS: int = 0
     GROQ_API_KEY: str = ""
 
+    # --- Phòng họp trực tuyến "Online Meeting" (LiveKit) ---
+    LIVEKIT_URL: str = "http://localhost:7880"  # backend gọi API quản lý phòng của LiveKit ở đây
+    # Cặp khóa dùng chung với LiveKit (docker-compose.yml). scripts/setup_lan.py sinh khóa ngẫu nhiên.
+    LIVEKIT_API_KEY: str = "devkey"
+    LIVEKIT_API_SECRET: str = "meetflow-dev-secret-chi-dung-tren-may-minh-0123456789"
+    ROOM_MAX_PARTICIPANTS: int = 6
+    ROOM_EMPTY_CLOSE_SEC: int = 30  # mọi người rời hết quá 30 giây → tự đóng phòng
+    # Phòng được tạo ngay lúc người mở bấm "Vào phòng". Tạo xong mà không ai vào được (lỗi kết nối…)
+    # thì đóng sau 1 phút.
+    ROOM_UNJOINED_CLOSE_SEC: int = 60
+    ROOM_HOST_ABSENT_SEC: int = 60  # chủ phòng vắng quá 1 phút (phòng còn người) → nhượng quyền chủ phòng
+    ROOM_UPLOAD_WAIT_SEC: int = 120  # phòng kết thúc → chờ ghi âm của mọi người tối đa 2 phút
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]

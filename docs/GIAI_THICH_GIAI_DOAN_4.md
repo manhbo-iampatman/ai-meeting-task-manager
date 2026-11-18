@@ -120,7 +120,7 @@ gọi mô hình chính (gemini-3.5-flash) ──ok──► xong
 - Trong lúc chạy: chờ quá 20 giây thì hiện gợi ý *"Gemini đang trả lời chậm hơn bình thường…"* (bộ đếm ở frontend). Lúc chuyển mô hình thì hiện *"Mô hình … quá tải, hệ thống đã tự chuyển sang mô hình dự phòng…"* (worker ghi vào cột `meetings.status_note`, gửi qua WebSocket).
 - Sau khi xong: biên bản có nhãn **"mô hình dự phòng"** (cột `meeting_summaries.fallback_from` lưu tên mô hình chính đã bị bỏ qua). Mô hình nhỏ hơn có thể kém hơn với cuộc họp dài hoặc khó, nên người duyệt cần kiểm tra kỹ hơn.
 
-> ⚠️ **Trạng thái thật của Ollama:** code và test giả lập đã xong, nhưng máy **chưa cài Ollama** nên **chưa chạy với mô hình thật**. Việc chạy thật và so sánh với Gemini để ở Giai đoạn 6. Khi hội đồng hỏi thì nói đúng như vậy.
+> ⚠️ **Trạng thái thật của Ollama:** code và test giả lập đã xong, nhưng máy **chưa cài Ollama** nên **chưa chạy với mô hình thật**. Việc chạy thật và so sánh với Gemini để ở Giai đoạn 7 (thực nghiệm). Khi hội đồng hỏi thì nói đúng như vậy.
 
 ---
 
@@ -327,7 +327,7 @@ Số token (thí nghiệm A): 1.067 vào, 373 ra.
 - **Whisper viết số bằng chữ số có lợi:** "thứ 6", "thứ 4", "ngày 25 tháng 11" đều được đổi đúng.
 
 **Hạn chế cần nói thật:**
-- Mới có **một** cuộc họp, **giọng máy đọc**, ngắn, nói rõ ràng. Con số 100% là **cận trên**, chưa phải kết luận. Giai đoạn 6 cần 10–20 cuộc họp người thật.
+- Mới có **một** cuộc họp, **giọng máy đọc**, ngắn, nói rõ ràng. Con số 100% là **cận trên**, chưa phải kết luận. Giai đoạn 7 (thực nghiệm) cần 10–20 cuộc họp người thật.
 - Chưa có số liệu của Ollama/Qwen (chưa cài).
 - Mô hình cấu hình sẵn ban đầu là `gemini-3.8-flash`, nhưng **không dùng được trong ngày thử**: một câu hỏi vài chục chữ mất 163–296 giây, sau đó trả lỗi 503/504 (quá tải). Mọi số liệu trên chạy bằng `gemini-3.5-flash`, nên mặc định đã đổi sang `gemini-3.5-flash`, kèm mô hình dự phòng `gemini-3.5-flash-lite` (xem mục 2).
 

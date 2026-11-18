@@ -6,11 +6,12 @@ import { useWorkspaceSocket } from '../../hooks/useWorkspaceSocket'
 import { formatClock, formatDate } from '../../lib/utils'
 import { Button } from '../ui'
 import MeetingStatusBadge from './MeetingStatusBadge'
+import OnlineMeetingButton from './OnlineMeetingButton'
 import PendingRecordings from './PendingRecordings'
 import RecordMeetingModal from './RecordMeetingModal'
 import UploadMeetingModal from './UploadMeetingModal'
 
-export const SOURCE_ICON = { audio: '🎙️', recording: '🔴', text: '📝' } as const
+export const SOURCE_ICON = { audio: '🎙️', recording: '🔴', text: '📝', online: '📹' } as const
 
 /** Khối "Cuộc họp" trong trang nhóm: danh sách + nút thêm. Trạng thái cập nhật realtime. */
 export default function MeetingsSection({ workspaceId }: { workspaceId: number }) {
@@ -26,7 +27,8 @@ export default function MeetingsSection({ workspaceId }: { workspaceId: number }
     <section className="mt-8">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-semibold">Cuộc họp</h2>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+          <OnlineMeetingButton workspaceId={workspaceId} />
           <Button variant="danger" onClick={() => setRecording(true)}>
             ● Ghi âm trực tiếp
           </Button>
@@ -45,7 +47,8 @@ export default function MeetingsSection({ workspaceId }: { workspaceId: number }
           onClick={() => setOpen(true)}
           className="w-full rounded-xl border-2 border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 hover:border-indigo-300 hover:text-indigo-600"
         >
-          Chưa có cuộc họp nào. <b>Ghi âm trực tiếp</b> hoặc <b>tải file ghi âm lên</b> để AI chuyển thành văn bản.
+          Chưa có cuộc họp nào. Họp ngay bằng <b>Online Meeting</b>, <b>ghi âm trực tiếp</b> hoặc <b>tải file ghi âm lên</b> để AI
+          chuyển thành văn bản.
         </button>
       )}
 

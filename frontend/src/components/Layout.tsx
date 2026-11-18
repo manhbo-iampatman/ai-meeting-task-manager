@@ -1,5 +1,7 @@
 import { Link, NavLink, Navigate, Outlet, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { resumePendingTracks } from '../lib/roomTrackUploader'
 import { useAuth } from '../stores/auth'
 import Avatar from './Avatar'
 import NotificationBell from './NotificationBell'
@@ -9,6 +11,16 @@ export default function Layout() {
   const { token, user, logout } = useAuth()
   const location = useLocation()
   const qc = useQueryClient()
+
+  // GĐ6: lần trước đóng tab / rớt mạng khi đang họp Online Meeting → gửi nốt ghi âm còn dở
+  // (ngay khi mở web, và mỗi khi có mạng lại)
+  useEffect(() => {
+    if (!token) return
+    void resumePendingTracks()
+    const onOnline = () => void resumePendingTracks()
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
+  }, [token])
 
   // Chưa đăng nhập → chuyển về /login, nhớ trang đang muốn vào để quay lại sau
   if (!token || !user) {

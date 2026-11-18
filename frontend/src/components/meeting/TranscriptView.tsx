@@ -20,6 +20,7 @@ function activeIndex(segments: Segment[], t: number): number {
  * - Bấm mốc thời gian → audio tua đến đó.
  * - Đoạn đang phát được tô sáng (lắng nghe sự kiện `timeupdate` của thẻ <audio>).
  * - Chế độ sửa: sửa lỗi nhận dạng (tên riêng, thuật ngữ) trước khi đưa cho AI tóm tắt.
+ * - Cuộc họp Online Meeting: mỗi đoạn có tên người nói (sửa chữ không làm mất tên).
  */
 export default function TranscriptView({
   segments,
@@ -143,14 +144,21 @@ export default function TranscriptView({
               <span className="mt-0.5 w-6 shrink-0 text-right font-mono text-xs text-slate-400">{i + 1}</span>
             )}
             {editing ? (
+              <div className="w-full">
+                {s.speaker && <div className="mb-0.5 text-xs font-semibold text-indigo-700">{s.speaker}</div>}
               <textarea
                 value={s.text}
                 rows={Math.max(1, Math.ceil(s.text.length / 90))}
                 onChange={(e) => setDraft((d) => d.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))}
                 className="w-full resize-y rounded-md border border-slate-200 px-2 py-1 text-sm outline-none focus:border-indigo-400"
               />
+              </div>
             ) : (
-              <p className={`text-sm leading-relaxed ${i === current ? 'text-slate-900' : 'text-slate-700'}`}>{s.text}</p>
+              <p className={`text-sm leading-relaxed ${i === current ? 'text-slate-900' : 'text-slate-700'}`}>
+                {/* Online Meeting: mỗi người ghi bằng mic của mình nên biết chắc ai nói câu này */}
+                {s.speaker && <span className="font-semibold text-indigo-700">{s.speaker}: </span>}
+                {s.text}
+              </p>
             )}
           </li>
         ))}

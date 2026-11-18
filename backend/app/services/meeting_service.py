@@ -1,6 +1,7 @@
 """Nghiệp vụ cuộc họp: lưu file ghi âm, đưa vào hàng đợi, báo tiến độ."""
 
 import logging
+import shutil
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile, status
@@ -62,6 +63,9 @@ def audio_abspath(meeting: Meeting) -> Path | None:
 
 
 def delete_audio(meeting: Meeting) -> None:
+    # Online Meeting: xóa luôn ghi âm riêng của từng người
+    for room_id in {t.room_id for t in meeting.tracks}:
+        shutil.rmtree(upload_root() / "rooms" / str(room_id), ignore_errors=True)
     p = audio_abspath(meeting)
     if p:
         try:
@@ -143,7 +147,8 @@ def enqueue_transcription(meeting: Meeting) -> None:
 
     try:
         job = meeting_queue.enqueue(
-            "app.workers.jobs.process_meeting_job",
+            # Online Meeting: nhận dạng từng người một rồi ghép lại (có tên người nói)
+            "app.workers.online_jobs.process_online_meeting_job" if meeting.source_type == "online" else "app.workers.jobs.process_meeting_job",
             meeting.id,
             job_timeout=2 * 60 * 60,  # tối đa 2 giờ / file
             result_ttl=24 * 60 * 60,
@@ -158,6 +163,29 @@ def enqueue_transcription(meeting: Meeting) -> None:
         log.error("Không đưa được vào hàng đợi: %s", e)
         meeting.status = MeetingStatus.FAILED
         meeting.error = "Không kết nối được hàng đợi (Redis). Hãy bật Docker rồi bấm Thử lại."
+
+
+def enqueue_late_track(track_id: int, force: bool = False) -> None:
+    """Online Meeting: ghi âm của một người về SAU khi cuộc họp đã được nhận dạng → nhận dạng bổ sung.
+
+    `force=True`: người duyệt đã bấm "Bổ sung" → đưa vào bản ghi dù bản ghi đã sửa tay / đã tóm tắt.
+    """
+    from app.core.queue import meeting_queue
+
+    try:
+        meeting_queue.enqueue(
+            "app.workers.online_jobs.process_late_track_job",
+            track_id,
+            force,
+            job_timeout=2 * 60 * 60,
+            result_ttl=24 * 60 * 60,
+            failure_ttl=7 * 24 * 60 * 60,
+        )
+    except Exception as e:  # noqa: BLE001 — Redis chưa chạy
+        log.error("Không đưa được ghi âm đến muộn vào hàng đợi: %s", e)
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "Không kết nối được hàng đợi (Redis). Hãy bật Docker rồi thử lại."
+        ) from e
 
 
 def enqueue_summarization(meeting: Meeting) -> None:

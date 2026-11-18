@@ -12,6 +12,12 @@ dist/
 .env
 !.env.example
 
+# Chứng chỉ HTTPS tự ký cho LAN (scripts/setup_lan.py tạo) — mỗi máy tự tạo
+certs/
+
+# Mã nguồn của sản phẩm khác, tải về để tham khảo / so sánh (không phải code của đề tài)
+tham_khao/
+
 # Dữ liệu sinh ra khi chạy
 backend/uploads/
 backend/models_cache/

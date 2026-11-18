@@ -30,6 +30,7 @@ Sau mỗi buổi họp nhóm / họp công ty thường xảy ra:
 | Không nhắc hạn, không theo dõi | **Thông báo**, nhắc hạn, theo dõi tiến độ, tổng kết hằng ngày |
 | Phải tự copy, tự gửi cho từng người | Mỗi người tự thấy **"Việc của tôi"**; có email / tin nhắn Zalo soạn sẵn |
 | Gửi ghi âm lên dịch vụ bên ngoài | Nhận dạng giọng nói **chạy ngay trên máy** (GPU), có thể chạy offline |
+| Không biết ai nói câu nào | Họp trong phòng **Online Meeting**: mỗi người một ghi âm riêng → bản ghi có **tên người nói** |
 
 ## 3. Đối tượng sử dụng
 
@@ -37,12 +38,14 @@ Sau mỗi buổi họp nhóm / họp công ty thường xảy ra:
 - **Nhóm làm việc nhỏ** trong công ty, startup, câu lạc bộ.
 - **Trưởng nhóm / quản lý** cần theo dõi ai đang làm gì.
 
-Chỉ **người tổ chức cuộc họp** bắt buộc có tài khoản; thành viên khác có thể tham gia sau.
+Chỉ **người tổ chức cuộc họp** bắt buộc có tài khoản; thành viên khác có thể tham gia sau. Riêng phòng họp trực tuyến **Online Meeting** thì ai vào cũng phải đăng nhập (để biết ai đang nói).
 
 ## 4. Luồng sử dụng chính
 
 ```
  1. Họp xong, tải file ghi âm lên        🎙️  (hoặc dán biên bản có sẵn)
+    HOẶC họp ngay trong phòng           📹  Online Meeting: cam / mic / chia sẻ màn hình,
+    Online Meeting                           mỗi người được ghi âm riêng → biết ai nói câu nào
             │
  2. AI chuyển giọng nói → văn bản        🧠  Whisper, chạy trên GPU
             │
@@ -90,7 +93,11 @@ Ký hiệu: ✅ đã làm xong · 🔜 đang / sắp làm · 💡 mở rộng n�
 | F16 | Đổi ngày tương đối ("thứ Sáu tuần sau") thành ngày cụ thể, tính theo ngày họp | ✅ |
 | F17 | **Màn hình duyệt** + nút **"Đẩy lên bảng"** (một transaction; tóm tắt lại vẫn đẩy thêm được, việc trùng bỏ tick sẵn) | ✅ |
 | F18 | Lịch sử cuộc họp, truy vết thẻ được tạo từ cuộc họp nào | ✅ phần truy vết (thẻ ↔ cuộc họp + câu gốc) |
-| F19 | Xuất biên bản PDF / Word | 🔜 Giai đoạn 5 |
+| F19 | Xuất biên bản PDF / Word | 🔜 để sau |
+| F26 | **Phòng họp trực tuyến "Online Meeting"** (LiveKit, chạy trong LAN): cam, mic, chia sẻ màn hình, tối đa 6 người, link phòng tự thêm người vào nhóm | ✅ |
+| F27 | **Ghi âm riêng từng người** trong phòng họp, gửi dần lên máy chủ, chịu được rớt mạng / đóng tab | ✅ |
+| F28 | **Bản ghi có tên người nói** + **lọc tiếng vọng** (mic thu lại tiếng người khác) | ✅ |
+| F29 | Người nói tự nhận việc ("để em làm") được **giao cho đúng người nói** | ✅ |
 
 ### 5.3. Thông báo & mời thành viên (đã chốt bổ sung)
 | Mã | Chức năng | Trạng thái |
@@ -107,7 +114,7 @@ Ký hiệu: ✅ đã làm xong · 🔜 đang / sắp làm · 💡 mở rộng n�
 |---|---|---|
 | E1 | **Ghi âm trực tiếp trên trình duyệt**, lưu tạm trên máy, tự tải lên khi có mạng lại | ✅ |
 | E2 | Hỏi đáp lịch sử cuộc họp (VD: *"Tháng trước nhóm chốt dùng database gì?"*) | 💡 |
-| E3 | Tách người nói (ai nói câu nào) | 💡 |
+| E3 | Tách người nói bằng AI cho cuộc họp tải từ file (diarization). *Với Online Meeting đã biết ai nói nhờ ghi âm riêng — F28* | 💡 |
 | E4 | Dashboard thống kê khối lượng công việc | 💡 |
 | E5 | **Voice note giao việc nhanh**: bấm micro nói 1 câu → thẻ lên bảng | 💡 |
 
@@ -122,9 +129,10 @@ Ký hiệu: ✅ đã làm xong · 🔜 đang / sắp làm · 💡 mở rộng n�
 | Cơ sở dữ liệu | PostgreSQL |
 | Hàng đợi xử lý nền | Redis + RQ (worker AI chạy riêng, xử lý lần lượt) |
 | Realtime | WebSocket + Redis Pub/Sub |
+| Phòng họp trực tuyến | **LiveKit** (máy chủ WebRTC mã nguồn mở, chạy bằng Docker) + thư viện giao diện `@livekit/components-react`; HTTPS tự ký cho mạng LAN |
 | Nhận dạng giọng nói | **faster-whisper** (`large-v3-turbo`, lượng tử hóa int8), chạy trên GPU của máy |
 | Tóm tắt & trích xuất | **Gemini API** (`gemini-3.5-flash`, tự chuyển sang `gemini-3.5-flash-lite` khi quá tải), Qwen qua Ollama (chạy trên máy, để so sánh — đã viết code, chưa chạy với mô hình thật) |
-| Hạ tầng | Docker (PostgreSQL + Redis) |
+| Hạ tầng | Docker (PostgreSQL + Redis + LiveKit) |
 
 ## 7. Kết quả đạt được tới hiện tại (đo thật trên laptop RTX 3050 4GB)
 
@@ -136,7 +144,8 @@ Ký hiệu: ✅ đã làm xong · 🔜 đang / sắp làm · 💡 mở rộng n�
 | Chống AI bịa chữ | Chặn được các câu ảo giác kiểu *"Hãy subscribe cho kênh…"*; file nhạc / không có lời nói được báo lỗi rõ ràng |
 | Trích xuất đầu việc (cuộc họp mẫu, Gemini) | **4/4 đầu việc**, đúng hạn chót 4/4, câu gốc tìm thấy 4/4; 1 việc người nói tự nhận được cố ý để trống người làm |
 | Thời gian tóm tắt | Khoảng **11–19 giây** cho cuộc họp 85 giây |
-| Kiểm thử tự động | 143 test |
+| Online Meeting (3 người, ghi âm riêng dựng từ cuộc họp mẫu) | Gán đúng người nói **19/19 câu**; lọc đúng **12/12 câu tiếng vọng**; người vào muộn 10 giây vẫn đúng mốc thời gian; câu "anh sẽ chuẩn bị bộ dữ liệu" được giao cho đúng người nói |
+| Kiểm thử tự động | 167 test |
 
 ## 8. Điểm nhấn khi bảo vệ
 
@@ -145,6 +154,7 @@ Ký hiệu: ✅ đã làm xong · 🔜 đang / sắp làm · 💡 mở rộng n�
 3. **Cải tiến dựa trên ngữ cảnh hệ thống:** dùng danh sách thành viên và biệt danh để AI nhận đúng tên người.
 4. **Kiểm soát rủi ro của AI:** lọc ảo giác, trích dẫn câu gốc, **con người duyệt** trước khi tạo công việc.
 5. **Bảo mật dữ liệu cuộc họp:** nhận dạng giọng nói chạy ngay trên máy, có thể chạy hoàn toàn offline.
+6. **Biết ai nói mà không cần AI đoán:** phòng họp trong ứng dụng ghi âm riêng từng người, nên việc người nói tự nhận được giao tự động; có thí nghiệm so sánh có / không có nhãn người nói.
 
 ---
 

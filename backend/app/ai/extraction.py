@@ -29,8 +29,8 @@ from app.ai.llm.prompts import (
     build_reduce_prompt,
     build_user_prompt,
 )
-from app.ai.postprocess.name_matching import MemberInfo, match_name, split_assignees
-from app.ai.postprocess.text_utils import norm_no_accent
+from app.ai.postprocess.name_matching import MemberInfo, NameMatch, match_name, split_assignees
+from app.ai.postprocess.text_utils import norm, norm_no_accent
 from app.ai.postprocess.vi_date_parser import parse_due
 
 log = logging.getLogger(__name__)
@@ -104,7 +104,7 @@ class ExtractedItem:
     title: str
     raw_assignee: str | None  # chữ LLM nghe được: "Nam", "anh", "Duy"...
     assignee_id: int | None  # tài khoản ghép được (None = chưa ghép)
-    assignee_match: str  # exact | no_accent | fuzzy | ambiguous | self | group | none
+    assignee_match: str  # exact | no_accent | fuzzy | ambiguous | self | group | none | speaker
     assignee_score: int
     assignee_candidates: list[int]
     due_text: str | None  # nguyên văn: "thứ Sáu tuần này"
@@ -175,6 +175,43 @@ def find_evidence(quote: str, segments: list[dict[str, Any]]) -> tuple[int | Non
     return paired if paired[1] > found[1] else found
 
 
+# ---------- Bản ghi có tên người nói (Online Meeting, Giai đoạn 6) ----------
+
+
+def speaker_labels(segments: list[dict[str, Any]]) -> dict[str, int]:
+    """Nhãn người nói xuất hiện trong bản ghi → id tài khoản: {"nguyễn văn nam": 3, ...}.
+
+    Chỉ cuộc họp Online Meeting mới có: mỗi người ghi bằng mic của mình nên hệ thống biết
+    chắc câu nào của ai. Bản ghi từ file ghi âm thường → dict rỗng.
+    """
+    out: dict[str, int] = {}
+    for s in segments:
+        label, uid = s.get("speaker"), s.get("speaker_id")
+        if label and uid is not None:
+            out[norm(str(label))] = int(uid)
+    return out
+
+
+def transcript_lines(segments: list[dict[str, Any]], with_speakers: bool = True) -> list[str]:
+    """Các dòng đưa cho LLM đọc. Có nhãn người nói thì mỗi dòng là "Họ Tên: câu nói"."""
+    lines = []
+    for s in segments:
+        text = str(s.get("text", "")).strip()
+        if not text:
+            continue
+        speaker = s.get("speaker") if with_speakers else None
+        lines.append(f"{speaker}: {text}" if speaker else text)
+    return lines
+
+
+def _strip_speaker(quote: str, speakers: dict[str, int]) -> str:
+    """LLM lỡ chép cả "Nguyễn Văn Nam: " vào câu trích dẫn → bỏ phần tên trước khi đi tìm câu gốc."""
+    head, sep, rest = quote.partition(":")
+    if sep and rest.strip() and norm(head) in speakers:
+        return rest.strip()
+    return quote
+
+
 # ---------- Hậu xử lý ----------
 
 
@@ -183,7 +220,9 @@ def _postprocess(
     segments: list[dict[str, Any]],
     meeting_date: date,
     members: list[MemberInfo],
+    speakers: dict[str, int] | None = None,
 ) -> list[ExtractedItem]:
+    speakers = speakers or {}
     out: list[ExtractedItem] = []
     for it in raw_items:
         if not it.task:
@@ -191,11 +230,21 @@ def _postprocess(
         # Một việc giao cho nhiều người → tách thành mỗi người một đầu việc
         names = [n for a in it.assignees for n in split_assignees(a)] or [None]
         due = parse_due(it.due, meeting_date)
-        seg_i, score = find_evidence(it.evidence, segments)
+        evidence = _strip_speaker(it.evidence, speakers)
+        seg_i, score = find_evidence(evidence, segments)
         found = score >= EVIDENCE_THRESHOLD
         start = segments[seg_i].get("start") if found and seg_i is not None else None
+        # Online Meeting: ai là người NÓI câu bằng chứng (biết chắc, vì mỗi người ghi bằng mic của mình)
+        said_by = segments[seg_i].get("speaker_id") if speakers and found and seg_i is not None else None
         for name in names:
-            m = match_name(name, members)
+            # LLM chép đúng nhãn người nói ở đầu dòng → biết chắc tài khoản, không cần so khớp mờ.
+            # Còn lại ghép tên như GĐ4.
+            label_id = speakers.get(norm(name)) if name else None
+            m = NameMatch(label_id, "exact", 100) if label_id is not None else match_name(name, members)
+            # Người làm chính là người nói câu đó → NGƯỜI NÓI TỰ NHẬN VIỆC ("để em làm", "anh lo phần này").
+            # Nhóm có 2 bạn trùng tên (ambiguous) mà một trong hai là người nói → chọn đúng người nói.
+            if said_by is not None and (m.user_id == said_by or (m.method == "ambiguous" and said_by in m.candidates)):
+                m = NameMatch(said_by, "speaker", 100)
             out.append(
                 ExtractedItem(
                     title=it.task[:255],
@@ -208,7 +257,7 @@ def _postprocess(
                     due_date=due.date,
                     due_approximate=due.approximate,
                     priority=it.priority,
-                    evidence_quote=it.evidence,
+                    evidence_quote=evidence,
                     evidence_found=found,
                     evidence_segment=seg_i if found else None,
                     evidence_start=float(start) if start is not None else None,
@@ -283,15 +332,18 @@ def extract_meeting(
     chunk_chars: int | None = None,
     include_members: bool = True,
     on_notice: Callable[[str], None] | None = None,
+    use_speakers: bool = True,
 ) -> ExtractionResult:
     """Tóm tắt + trích xuất đầu việc từ bản ghi.
 
     `include_members=False` dùng cho thí nghiệm "có / không đưa danh sách thành viên vào prompt".
+    `use_speakers=False` dùng cho thí nghiệm "có / không có nhãn người nói" (Online Meeting): bỏ
+    tên người nói khỏi các dòng đưa cho LLM, coi như bản ghi từ file ghi âm thường.
     `on_notice(thông báo)`: được gọi khi LLM phải chuyển sang mô hình dự phòng (để hiện lên giao diện).
     """
     t0 = time.perf_counter()
-    lines = [str(s.get("text", "")).strip() for s in segments]
-    lines = [x for x in lines if x]
+    lines = transcript_lines(segments, with_speakers=use_speakers)
+    speakers = speaker_labels(segments) if use_speakers else {}
     if not lines:
         raise LLMError("Bản ghi trống, không có gì để tóm tắt")
     begin_job = getattr(llm, "begin_job", None)
@@ -340,7 +392,7 @@ def extract_meeting(
         add_usage()
         report(1.0)
 
-    items = _postprocess(raw_items, segments, meeting_date, members)
+    items = _postprocess(raw_items, segments, meeting_date, members, speakers)
     return ExtractionResult(
         summary=summary.model_dump(),
         items=items,

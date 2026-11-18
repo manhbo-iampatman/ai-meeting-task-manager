@@ -33,6 +33,25 @@ services:
       - redisdata:/data
     restart: unless-stopped
 
+  # Máy chủ phòng họp cho "Online Meeting" (Giai đoạn 6).
+  # Chạy `python scripts/setup_lan.py` trước để có file .env (IP của máy + khóa API).
+  livekit:
+    image: livekit/livekit-server:v1.13.11
+    container_name: meetflow-livekit
+    command: --config /etc/livekit.yaml
+    environment:
+      # "khóa: bí mật" — backend dùng đúng cặp này để ký vé vào phòng
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-meetflow-dev-secret-chi-dung-tren-may-minh-0123456789}"
+      # IP mà trình duyệt của mọi người dùng để gửi hình / tiếng tới máy này
+      NODE_IP: "${LIVEKIT_NODE_IP:-127.0.0.1}"
+    ports:
+      - "7880:7880"       # tín hiệu (WebSocket) — Vite chuyển tiếp /rtc tới đây
+      - "7881:7881"       # hình / tiếng qua TCP
+      - "7882:7882/udp"   # hình / tiếng qua UDP
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    restart: unless-stopped
+
 volumes:
   pgdata:
   redisdata:

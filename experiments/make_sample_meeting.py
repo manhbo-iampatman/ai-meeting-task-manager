@@ -2,7 +2,7 @@
 
 Dùng để:
   1. Chạy thử trọn luồng tải ghi âm → chuyển giọng nói (Giai đoạn 3).
-  2. Làm dữ liệu cho chương thực nghiệm (Giai đoạn 6): vì biết trước chính xác
+  2. Làm dữ liệu cho chương thực nghiệm (Giai đoạn 7): vì biết trước chính xác
      ai nói gì, ai được giao việc gì → đo được WER và độ chính xác trích xuất.
 
 Giọng đọc: edge-tts (dịch vụ đọc của Microsoft Edge, có 2 giọng tiếng Việt).

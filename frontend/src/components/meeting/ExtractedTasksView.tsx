@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type RefObject } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, type RefObject } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { pushToBoard, updateDraft } from '../../api/endpoints'
@@ -8,11 +8,16 @@ import AssigneePicker from '../AssigneePicker'
 import Avatar from '../Avatar'
 import { Button, ErrorText } from '../ui'
 
+/** Cuộc họp Online Meeting: bản ghi có tên người nói → đại từ ("em", "anh") còn sót lại nghĩa là
+ * người nói GIAO việc cho ai đó không rõ, chứ không phải tự nhận. */
+const SpeakersKnown = createContext(false)
+
 const chip = 'rounded-full px-2 py-0.5 text-xs font-medium'
 const field = 'rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500'
 
 /** Người làm (chế độ chỉ xem): ghép được tài khoản hay chưa, và vì sao chưa. */
 function Assignee({ t }: { t: ExtractedTask }) {
+  const speakersKnown = useContext(SpeakersKnown)
   if (t.assignee) {
     const heard = t.assignee_match === 'fuzzy' || t.assignee_match === 'no_accent'
     return (
@@ -25,6 +30,11 @@ function Assignee({ t }: { t: ExtractedTask }) {
           </span>
         )}
         {t.assignee_match === 'claimed' && <span className="text-xs text-slate-400">(đã tự nhận tên)</span>}
+        {t.assignee_match === 'speaker' && (
+          <span className="text-xs text-emerald-600" title="Biết chắc ai nói câu này vì mỗi người ghi âm bằng mic của mình">
+            (người nói tự nhận)
+          </span>
+        )}
       </span>
     )
   }
@@ -49,9 +59,13 @@ function Assignee({ t }: { t: ExtractedTask }) {
     return (
       <span
         className={`${chip} bg-amber-100 text-amber-800`}
-        title="Bản ghi không cho biết ai là người nói câu này, nên hệ thống không đoán. Chọn người làm ở bước duyệt."
+        title={
+          speakersKnown
+            ? 'Người nói giao việc bằng đại từ mà không gọi tên, nên hệ thống không đoán. Chọn người làm ở bước duyệt.'
+            : 'Bản ghi không cho biết ai là người nói câu này, nên hệ thống không đoán. Chọn người làm ở bước duyệt.'
+        }
       >
-        Người nói tự nhận (“{t.raw_assignee}”)
+        {speakersKnown ? 'Giao bằng đại từ' : 'Người nói tự nhận'} (“{t.raw_assignee}”)
       </span>
     )
   if (t.assignee_match === 'group') return <span className={`${chip} bg-slate-100 text-slate-600`}>Cả nhóm (“{t.raw_assignee}”)</span>
@@ -60,9 +74,14 @@ function Assignee({ t }: { t: ExtractedTask }) {
 
 /** Gợi ý dưới ô chọn người làm: AI đã nghe được gì. */
 function AiHint({ t }: { t: ExtractedTask }) {
+  const speakersKnown = useContext(SpeakersKnown)
   const raw = t.raw_assignee
   let msg: string | null = null
-  if (t.assignee_match === 'self') msg = `AI nghe “${raw}”: người nói tự nhận việc, bản ghi không cho biết là ai.`
+  if (t.assignee_match === 'self')
+    msg = speakersKnown
+      ? `AI nghe “${raw}”: việc được giao bằng đại từ, không gọi tên — hãy chọn người làm.`
+      : `AI nghe “${raw}”: người nói tự nhận việc, bản ghi không cho biết là ai.`
+  else if (t.assignee_match === 'speaker') msg = 'Người nói tự nhận việc này — biết chắc là ai vì mỗi người ghi âm bằng mic của mình.'
   else if (t.assignee_match === 'group') msg = `AI nghe “${raw}”: giao cho cả nhóm.`
   else if (t.assignee_match === 'ambiguous') msg = `“${raw}” trùng nhiều thành viên — hãy chọn đúng người.`
   else if ((t.assignee_match === 'fuzzy' || t.assignee_match === 'no_accent') && t.assignee) msg = `Ghép theo tên gần giống: AI nghe “${raw}”.`
@@ -326,6 +345,7 @@ export default function ExtractedTasksView({
   }
 
   return (
+    <SpeakersKnown.Provider value={meeting.source_type === 'online'}>
     <div className="rounded-xl border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3">
         <h2 className="font-semibold">{canReview ? 'Duyệt đầu việc' : 'Đầu việc AI đề xuất'}</h2>
@@ -442,5 +462,6 @@ export default function ExtractedTasksView({
         </details>
       )}
     </div>
+    </SpeakersKnown.Provider>
   )
 }

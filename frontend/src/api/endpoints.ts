@@ -15,6 +15,8 @@ import type {
   NotificationList,
   PendingName,
   Priority,
+  Room,
+  RoomJoin,
   Segment,
   Task,
   TaskDetail,
@@ -130,6 +132,35 @@ export const claimName = (workspaceId: number, key: string) =>
 export const undoClaim = (claimId: number) => data(api.post<NameClaim>(`/name-claims/${claimId}/undo`))
 export const updateTranscript = (id: number, segments: Segment[]) =>
   data(api.put<MeetingDetail>(`/meetings/${id}/transcript`, { segments }))
+/** Online Meeting: đưa ghi âm đến muộn của một người vào bản ghi (khi bản ghi đã sửa tay / đã tóm tắt). */
+export const mergeLateTrack = (meetingId: number, trackId: number) =>
+  data(api.post<MeetingDetail>(`/meetings/${meetingId}/tracks/${trackId}/merge`))
+
+// ---- Giai đoạn 6: phòng họp trực tuyến "Online Meeting" ----
+/** Phòng đang mở của nhóm (null = chưa có). */
+export const getOpenRoom = (workspaceId: number) => data(api.get<Room | null>(`/workspaces/${workspaceId}/room`))
+/** Mở phòng. Nhóm đang có phòng mở thì trả về chính phòng đó. */
+export const openRoom = (workspaceId: number) => data(api.post<Room>(`/workspaces/${workspaceId}/room`, {}))
+export const getRoom = (code: string) => data(api.get<Room>(`/rooms/${code}`))
+/** Lấy vé vào phòng (chưa ở trong nhóm thì được tự thêm vào nhóm). */
+export const joinRoom = (code: string) => data(api.post<RoomJoin>(`/rooms/${code}/join`))
+export const startRoomRecording = (code: string) => data(api.post<Room>(`/rooms/${code}/recording/start`))
+export const stopRoomRecording = (code: string) => data(api.post<Room>(`/rooms/${code}/recording/stop`))
+/** "Chỉ mình tôi rời". Chủ phòng rời thì quyền chuyển cho người vào sớm nhất còn lại; không còn ai thì phòng kết thúc. */
+export const leaveRoom = (code: string) => data(api.post<{ room: Room; meeting_id: number | null }>(`/rooms/${code}/leave`))
+export const endRoom = (code: string) => data(api.post<{ room: Room; meeting_id: number | null }>(`/rooms/${code}/end`))
+// Ghi âm của từng người: mở track → gửi từng khúc → báo xong
+export const createRoomTrack = (code: string, body: { mime: string; elapsed_ms: number }) =>
+  data(api.post<{ track_id: number; next_seq: number }>(`/rooms/${code}/tracks`, body))
+export const uploadTrackChunk = (trackId: number, seq: number, chunk: Blob) =>
+  data(
+    api.put<{ track_id: number; next_seq: number }>(`/room-tracks/${trackId}/chunks/${seq}`, chunk, {
+      headers: { 'Content-Type': 'application/octet-stream' },
+      timeout: 30000,
+    }),
+  )
+export const finishRoomTrack = (trackId: number) => data(api.post(`/room-tracks/${trackId}/finish`))
+
 /** Thẻ <audio> không gửi được header → đưa token vào URL. */
 export const meetingAudioUrl = (id: number, token: string) =>
   `/api/meetings/${id}/audio?token=${encodeURIComponent(token)}`

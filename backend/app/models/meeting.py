@@ -44,7 +44,8 @@ class Meeting(TimestampMixin, Base):
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(200))
     meeting_date: Mapped[date] = mapped_column(Date)
-    source_type: Mapped[str] = mapped_column(String(10))  # audio (tải file) | recording (ghi trực tiếp) | text
+    # audio (tải file) | recording (ghi trực tiếp) | text | online (phòng Online Meeting, GĐ6)
+    source_type: Mapped[str] = mapped_column(String(10))
 
     # Thông tin file ghi âm (nếu có). File lưu trên đĩa, CSDL chỉ lưu đường dẫn.
     audio_path: Mapped[str | None] = mapped_column(String(500))
@@ -71,6 +72,9 @@ class Meeting(TimestampMixin, Base):
     extracted_tasks: Mapped[list["ExtractedTask"]] = relationship(
         back_populates="meeting", order_by="ExtractedTask.position", cascade="all, delete-orphan", passive_deletes=True
     )
+    # Online Meeting: ghi âm riêng của từng người. Chỉ để ĐỌC — track thuộc về phòng họp
+    # (app.models.room); xóa cuộc họp thì CSDL tự xóa track (ON DELETE CASCADE).
+    tracks: Mapped[list["MeetingTrack"]] = relationship(order_by="MeetingTrack.id", viewonly=True)  # noqa: F821
 
 
 class Transcript(Base):
@@ -81,7 +85,8 @@ class Transcript(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     meeting_id: Mapped[int] = mapped_column(ForeignKey("meetings.id", ondelete="CASCADE"), unique=True)
     full_text: Mapped[str] = mapped_column(Text, default="")
-    # [{"start": 0.0, "end": 3.5, "text": "..."}] — JSONB vì số đoạn thay đổi, không cần bảng riêng
+    # [{"start": 0.0, "end": 3.5, "text": "..."}] — JSONB vì số đoạn thay đổi, không cần bảng riêng.
+    # Online Meeting có thêm "speaker" (họ tên người nói), "speaker_id", "track_id", "rms" (âm lượng).
     segments: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
     language: Mapped[str | None] = mapped_column(String(10))
     stt_model: Mapped[str | None] = mapped_column(String(100))
@@ -141,6 +146,7 @@ class ExtractedTask(Base):
     raw_assignee: Mapped[str | None] = mapped_column(String(100))  # chữ AI nghe được: "Nam", "anh", "Duy"
     assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     # Kết quả ghép tên: exact | no_accent | fuzzy | ambiguous | self | group | none
+    # | speaker (Online Meeting: người nói tự nhận việc, biết chắc là ai nhờ ghi âm riêng)
     assignee_match: Mapped[str] = mapped_column(String(20), default="none")
     assignee_score: Mapped[int] = mapped_column(Integer, default=0)
     # Khi ambiguous (2 thành viên trùng tên): id các tài khoản có thể đúng, để gợi ý lúc duyệt

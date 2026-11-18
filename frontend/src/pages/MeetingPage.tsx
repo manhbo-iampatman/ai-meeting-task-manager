@@ -6,6 +6,7 @@ import {
   getMeeting,
   getWorkspace,
   meetingAudioUrl,
+  mergeLateTrack,
   retryMeeting,
   summarizeMeeting,
   updateMeeting,
@@ -37,8 +38,13 @@ function Pipeline({ m }: { m: MeetingDetail }) {
   }, [m.status])
 
   const hasTranscript = m.status === 'transcribed' || m.status === 'summarizing' || m.status === 'review'
+  const online = m.source_type === 'online'
   const steps = [
-    { key: 'upload', label: m.source_type === 'text' ? 'Nhận văn bản' : 'Tải file lên', state: 'done' },
+    {
+      key: 'upload',
+      label: m.source_type === 'text' ? 'Nhận văn bản' : online ? 'Nhận ghi âm riêng của từng người' : 'Tải file lên',
+      state: 'done',
+    },
     {
       key: 'queue',
       label: 'Chờ trong hàng đợi',
@@ -46,7 +52,12 @@ function Pipeline({ m }: { m: MeetingDetail }) {
     },
     {
       key: 'stt',
-      label: m.source_type === 'text' ? 'Bản ghi (văn bản có sẵn)' : 'Chuyển giọng nói → văn bản (Whisper)',
+      label:
+        m.source_type === 'text'
+          ? 'Bản ghi (văn bản có sẵn)'
+          : online
+            ? 'Chuyển giọng nói → văn bản, lần lượt từng người (Whisper), ghép theo thời gian'
+            : 'Chuyển giọng nói → văn bản (Whisper)',
       state: m.status === 'transcribing' ? 'active' : hasTranscript ? 'done' : m.status === 'failed' ? 'error' : 'idle',
     },
     {
@@ -129,8 +140,11 @@ export default function MeetingPage() {
   const { data: m, isLoading, error } = useQuery({
     queryKey: ['meeting', id],
     queryFn: () => getMeeting(id),
-    // Dự phòng khi mất WebSocket: đang xử lý thì cứ 5 giây hỏi lại 1 lần
-    refetchInterval: (q) => (q.state.data && PROCESSING.has(q.state.data.status) ? 5000 : false),
+    // Dự phòng khi mất WebSocket: đang xử lý (hoặc Online Meeting đang chờ ghi âm gửi về) thì cứ 5 giây hỏi lại 1 lần
+    refetchInterval: (q) => {
+      const d = q.state.data
+      return d && (PROCESSING.has(d.status) || (d.source_type === 'online' && d.status === 'uploaded')) ? 5000 : false
+    },
   })
   const live = useWorkspaceSocket(m?.workspace_id)
   // Thành viên + bảng của nhóm: để chọn người làm và chọn bảng khi duyệt đầu việc (GĐ5)
@@ -148,6 +162,7 @@ export default function MeetingPage() {
   const summarize = useMutation({ mutationFn: () => summarizeMeeting(id), onSuccess: setData })
   const rename = useMutation({ mutationFn: (title: string) => updateMeeting(id, { title }), onSuccess: setData })
   const save = useMutation({ mutationFn: (segs: Segment[]) => updateTranscript(id, segs), onSuccess: setData })
+  const mergeTrack = useMutation({ mutationFn: (trackId: number) => mergeLateTrack(id, trackId), onSuccess: setData })
   const remove = useMutation({
     mutationFn: () => deleteMeeting(id),
     onSuccess: () => {
@@ -166,13 +181,18 @@ export default function MeetingPage() {
   // Lỗi ở bước tóm tắt: bản ghi vẫn còn, trạng thái quay về "đã có bản ghi" / "chờ duyệt" kèm thông báo lỗi
   const summarizeError = m.status !== 'failed' && !processing ? m.error : null
   const speed = tr?.duration_sec && tr?.processing_sec ? tr.duration_sec / tr.processing_sec : null
+  // Online Meeting: người có ghi âm nhưng trình duyệt chưa báo "gửi xong" → bản ghi có thể thiếu lời của họ
+  const missingTracks = (m.tracks ?? []).filter((t) => t.has_audio && !t.finished)
 
   const copyText = async () => {
     if (tr) await navigator.clipboard.writeText(tr.full_text)
   }
   const downloadText = () => {
     if (!tr) return
-    const lines = tr.segments.map((s) => (s.start != null ? `[${formatClock(s.start)}] ${s.text}` : s.text))
+    const lines = tr.segments.map((s) => {
+      const text = s.speaker ? `${s.speaker}: ${s.text}` : s.text
+      return s.start != null ? `[${formatClock(s.start)}] ${text}` : text
+    })
     const blob = new Blob([`${m.title} — ${formatDate(m.meeting_date)}\n\n${lines.join('\n')}\n`], { type: 'text/plain;charset=utf-8' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
@@ -223,7 +243,62 @@ export default function MeetingPage() {
             </div>
           )}
 
+          {/* Online Meeting vừa kết thúc: chờ trình duyệt của mọi người gửi nốt ghi âm (tối đa 2 phút) */}
+          {m.source_type === 'online' && m.status === 'uploaded' && (
+            <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-800">
+              <p className="font-medium">⏳ {m.status_note ?? 'Đang chờ ghi âm của mọi người gửi về…'}</p>
+              <p className="mt-1 text-xs">
+                Mỗi người ghi âm bằng mic của mình. Đủ ghi âm của mọi người (hoặc sau tối đa 2 phút) hệ thống sẽ tự chuyển
+                thành bản ghi có tên người nói.
+              </p>
+              {m.tracks.length > 0 && (
+                <p className="mt-2 text-xs">
+                  {m.tracks.map((t) => `${t.speaker_name} ${t.finished ? '✓' : '…'}`).join(' · ')}
+                </p>
+              )}
+            </div>
+          )}
+
           {(processing || (m.status === 'failed' && !tr)) && <Pipeline m={m} />}
+
+          {/* Online Meeting: ghi âm của ai đó chưa về đủ, hoặc về muộn đang chờ đưa vào bản ghi */}
+          {m.source_type === 'online' && m.status !== 'uploaded' && !transcribing && (
+            <>
+              {missingTracks.length > 0 && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                  <p className="font-medium">Thiếu ghi âm của {missingTracks.map((t) => t.speaker_name).join(', ')}</p>
+                  <p className="mt-1 text-xs">
+                    Trình duyệt của người này chưa gửi hết (rớt mạng hoặc đóng tab đột ngột), nên bản ghi có thể thiếu lời của
+                    họ. Khi họ mở lại MeetFlow, phần còn lại sẽ tự được gửi lên và bổ sung.
+                  </p>
+                </div>
+              )}
+              {m.tracks
+                .filter((t) => t.pending)
+                .map((t) => (
+                  <div key={t.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">
+                    <p className="min-w-0 flex-1">
+                      <b>Ghi âm đến muộn của {t.speaker_name} đã về.</b> Bản ghi đã được sửa tay hoặc đã tóm tắt nên hệ thống
+                      không tự thêm vào.
+                    </p>
+                    {m.can_review && (
+                      <Button
+                        disabled={mergeTrack.isPending || processing}
+                        onClick={() =>
+                          confirm(
+                            `Đưa lời của ${t.speaker_name} vào bản ghi? Câu của những người khác (kể cả chỗ đã sửa tay) được giữ nguyên. ` +
+                              'Nếu đã tóm tắt, bạn nên bấm tóm tắt lại sau đó.',
+                          ) && mergeTrack.mutate(t.id)
+                        }
+                      >
+                        Bổ sung ghi âm của {t.speaker_name}
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              <ErrorText>{mergeTrack.error && errorMessage(mergeTrack.error)}</ErrorText>
+            </>
+          )}
 
           {summarizeError && (
             <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
@@ -266,7 +341,9 @@ export default function MeetingPage() {
             <dl className="space-y-1.5 text-slate-600">
               <div className="flex justify-between gap-2">
                 <dt>Nguồn</dt>
-                <dd className="text-right">{{ audio: '🎙️ Tải file ghi âm', recording: '🔴 Ghi trực tiếp', text: '📝 Văn bản' }[m.source_type]}</dd>
+                <dd className="text-right">
+                  {{ audio: '🎙️ Tải file ghi âm', recording: '🔴 Ghi trực tiếp', text: '📝 Văn bản', online: '📹 Online Meeting' }[m.source_type]}
+                </dd>
               </div>
               {m.audio_filename && (
                 <div className="flex justify-between gap-2">

@@ -25,7 +25,7 @@ export type RecordingMeta = {
 }
 
 const DB_NAME = 'meetflow-recordings'
-const DB_VERSION = 1
+const DB_VERSION = 2 // v2: thêm store "roomTracks" (ghi âm Online Meeting đang gửi dở)
 
 let dbPromise: Promise<IDBDatabase> | null = null
 
@@ -40,8 +40,16 @@ function openDB(): Promise<IDBDatabase> {
           const s = db.createObjectStore('chunks', { autoIncrement: true })
           s.createIndex('byRecording', 'recordingId')
         }
+        if (!db.objectStoreNames.contains('roomTracks')) db.createObjectStore('roomTracks', { keyPath: 'trackId' })
       }
-      req.onsuccess = () => resolve(req.result)
+      req.onsuccess = () => {
+        // Tab khác mở bản web mới hơn (cần nâng cấp CSDL) → nhường, không chặn nó
+        req.result.onversionchange = () => {
+          req.result.close()
+          dbPromise = null
+        }
+        resolve(req.result)
+      }
       req.onerror = () => reject(req.error)
     })
   }
@@ -102,6 +110,63 @@ export async function deleteRecording(id: string): Promise<void> {
         t.objectStore('chunks').delete(c.primaryKey)
         c.continue()
       }
+    }
+    t.oncomplete = () => resolve()
+    t.onerror = () => reject(t.error)
+  })
+}
+
+// ---------- Online Meeting (Giai đoạn 6): ghi âm của mình trong phòng họp, đang gửi dần lên máy chủ ----------
+
+/**
+ * Một "track" = ghi âm mic của MÌNH trong một buổi Online Meeting. Các khúc âm thanh nằm chung
+ * store "chunks" (recordingId = "track-<id>"), gửi lên máy chủ được khúc nào thì xóa khúc đó.
+ * Đóng tab đột ngột / rớt mạng → phần chưa gửi vẫn nằm đây, lần sau mở web sẽ gửi nốt.
+ */
+export type RoomTrackMeta = {
+  trackId: number
+  roomCode: string
+  /** Số khúc máy chủ đã nhận (= số thứ tự khúc tiếp theo cần gửi) */
+  acked: number
+  /** Đã ngừng ghi (không còn khúc mới) → gửi hết thì báo "xong" cho máy chủ */
+  closed: boolean
+  createdAt: number
+}
+
+export const trackRecordingId = (trackId: number) => `track-${trackId}`
+
+export function saveTrackMeta(meta: RoomTrackMeta): Promise<unknown> {
+  return tx(['roomTracks'], 'readwrite', (t) => t.objectStore('roomTracks').put(meta))
+}
+
+export function listTrackMetas(): Promise<RoomTrackMeta[]> {
+  return tx<RoomTrackMeta[]>(['roomTracks'], 'readonly', (t) => t.objectStore('roomTracks').getAll()).then((x) => x ?? [])
+}
+
+export function deleteTrackMeta(trackId: number): Promise<void> {
+  return tx(['roomTracks'], 'readwrite', (t) => t.objectStore('roomTracks').delete(trackId)).then(() =>
+    deleteChunks(trackRecordingId(trackId)),
+  )
+}
+
+/** Các khúc còn lưu của một bản ghi, theo đúng thứ tự. */
+export function getChunks(recordingId: string): Promise<{ seq: number; data: Blob }[]> {
+  return tx<{ seq: number; data: Blob }[]>(['chunks'], 'readonly', (t) =>
+    t.objectStore('chunks').index('byRecording').getAll(recordingId),
+  ).then((rows) => (rows ?? []).sort((a, b) => a.seq - b.seq))
+}
+
+/** Xóa các khúc của một bản ghi; có `uptoSeq` thì chỉ xóa khúc có số thứ tự ≤ giá trị đó. */
+export async function deleteChunks(recordingId: string, uptoSeq?: number): Promise<void> {
+  const db = await openDB()
+  await new Promise<void>((resolve, reject) => {
+    const t = db.transaction(['chunks'], 'readwrite')
+    const cur = t.objectStore('chunks').index('byRecording').openCursor(IDBKeyRange.only(recordingId))
+    cur.onsuccess = () => {
+      const c = cur.result
+      if (!c) return
+      if (uptoSeq == null || (c.value as { seq: number }).seq <= uptoSeq) c.delete()
+      c.continue()
     }
     t.oncomplete = () => resolve()
     t.onerror = () => reject(t.error)

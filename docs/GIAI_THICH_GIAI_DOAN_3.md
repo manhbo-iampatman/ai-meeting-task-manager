@@ -182,7 +182,7 @@ File **không hề có câu này**. Whisper được huấn luyện trên rất 
 ## 7. Dữ liệu thử nghiệm tiếng Việt: `experiments/make_sample_meeting.py`
 
 Script **tự sinh một cuộc họp tiếng Việt giả lập** (3 người: Nam, Lan, Minh) bằng giọng đọc của Microsoft Edge (edge-tts), kèm sẵn **đáp án chuẩn**:
-- `reference.txt`: bản ghi đúng, dùng để tính **WER** ở Giai đoạn 6.
+- `reference.txt`: bản ghi đúng, dùng để tính **WER** ở Giai đoạn 7 (thực nghiệm).
 - `expected_tasks.json`: 4 đầu việc đúng (ai, việc gì, hạn chót), dùng để chấm bước trích xuất ở Giai đoạn 4.
 
 Vì biết trước chính xác "đáp án", bộ dữ liệu này dùng được để **đo độ chính xác** một cách khách quan.
@@ -212,7 +212,7 @@ Chạy lại bằng: `python experiments/eval_wer.py --meeting <id> experiments/
 
 Lỗi cuối cho thấy tên riêng tiếng Việt trùng với từ thông dụng (Minh/mình, Nam/năm, Lan/lan…) là **thách thức thật**. Đây là lý do có bước **sửa bản ghi**, **biệt danh** và **màn hình duyệt** trước khi tạo công việc.
 
-**Hạn chế cần nói thật:** giọng máy đọc rõ ràng hơn người thật (không ồn, không nói chen). Kết quả trên dữ liệu này là **cận trên**; cần bổ sung ghi âm người thật ở Giai đoạn 6. Ngoài ra dịch vụ đọc miễn phí này khá chập chờn, nên script có cơ chế thử lại nhiều lần.
+**Hạn chế cần nói thật:** giọng máy đọc rõ ràng hơn người thật (không ồn, không nói chen). Kết quả trên dữ liệu này là **cận trên**; cần bổ sung ghi âm người thật ở Giai đoạn 7 (thực nghiệm). Ngoài ra dịch vụ đọc miễn phí này khá chập chờn, nên script có cơ chế thử lại nhiều lần.
 
 ---
 

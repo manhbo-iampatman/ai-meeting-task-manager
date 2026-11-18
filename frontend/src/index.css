@@ -3,3 +3,25 @@
 body {
   @apply bg-slate-50 text-slate-800 antialiased;
 }
+
+/* Màn hình chờ của phòng Online Meeting: tên lấy từ tài khoản nên ẩn ô nhập tên của LiveKit */
+.mf-prejoin .lk-prejoin {
+  width: 100%;
+  margin: 0;
+}
+.mf-prejoin .lk-username-container input,
+.mf-prejoin input#username {
+  display: none;
+}
+
+/* Thanh nút trong phòng họp: màn hình hẹp thì cho xuống dòng thay vì tràn ra ngoài */
+.lk-control-bar.mf-control-bar {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  max-width: 100%;
+  /* LiveKit khóa thanh này cao 69px; bỏ khóa để hàng nút thứ hai (nếu có) không bị cắt mất */
+  height: auto;
+  max-height: none;
+  flex-shrink: 0;
+}

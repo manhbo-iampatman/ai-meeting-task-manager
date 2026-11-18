@@ -2,15 +2,31 @@ from datetime import date, datetime
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_serializer
 
 from app.schemas.common import ORMModel, UserBrief
+from app.schemas.room import MeetingTrackOut
 
 
 class SegmentIn(BaseModel):
     start: float | None = None
     end: float | None = None
     text: str = Field(max_length=5000)
+    # Online Meeting: ai nói câu này. Giữ nguyên khi người dùng sửa chữ trong bản ghi.
+    speaker: str | None = Field(default=None, max_length=100)
+    speaker_id: int | None = None
+    track_id: int | None = None
+    rms: float | None = None  # âm lượng (để lọc tiếng vọng)
+
+    @model_serializer(mode="wrap")
+    def _hide_empty_speaker_fields(self, handler):
+        """Cuộc họp thường (không phải Online Meeting) không có các trường người nói → không
+        trả về / không lưu các khóa rỗng đó."""
+        data = handler(self)
+        for k in ("speaker", "speaker_id", "track_id", "rms"):
+            if data.get(k) is None:
+                data.pop(k, None)
+        return data
 
 
 class TranscriptUpdate(BaseModel):
@@ -125,3 +141,5 @@ class MeetingDetail(MeetingOut):
     summary: SummaryOut | None = None
     extracted_tasks: list[ExtractedTaskOut] = []
     can_review: bool = False  # người đang xem có được duyệt + đẩy lên bảng không
+    # Online Meeting: ghi âm của từng người (ai chưa gửi đủ, ai có phần đến muộn chờ bổ sung)
+    tracks: list[MeetingTrackOut] = []

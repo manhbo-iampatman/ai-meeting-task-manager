@@ -197,10 +197,10 @@ Công cụ: thư viện `jiwer`.
 > Dự kiến bắt đầu 16/11/2026. Mỗi giai đoạn có mục **"Kiến thức cần nắm"**: mình sẽ giải thích kỹ phần này để bạn tự trả lời được trước hội đồng.
 
 ### Giai đoạn 0 – Chuẩn bị (Tuần 1: 16/11 – 22/11)
-- [ ] Cài Docker Desktop, lấy Gemini API key
-- [ ] Khởi tạo repo Git, cấu trúc thư mục, Docker Compose (PostgreSQL + Redis)
-- [ ] Khung FastAPI + khung React chạy được "Hello"
-- [ ] Chạy thử faster-whisper trên GPU với 1 file mẫu
+- [x] Cài Docker Desktop, lấy Gemini API key
+- [x] Khởi tạo repo Git, cấu trúc thư mục, Docker Compose (PostgreSQL + Redis)
+- [x] Khung FastAPI + khung React chạy được "Hello"
+- [x] Chạy thử faster-whisper trên GPU với 1 file mẫu
 - **Kiến thức cần nắm:** kiến trúc client–server, REST API, Docker là gì, vì sao chọn FastAPI
 
 ### Giai đoạn 1 – Phân tích thiết kế (Tuần 2: 23/11 – 29/11)
@@ -210,45 +210,54 @@ Công cụ: thư viện `jiwer`.
 - **Kiến thức cần nắm:** UML, chuẩn hóa CSDL, vì sao thiết kế human-in-the-loop
 
 ### Giai đoạn 2 – Phân hệ quản lý (Tuần 3–5: 30/11 – 20/12)
-- [ ] Auth JWT, user, workspace, mời thành viên (F01–F03)
-- [ ] Board, column, task, comment, API + giao diện (F04–F05)
-- [ ] Kéo-thả + lưu thứ tự + WebSocket realtime (F06)
-- [ ] Lọc, tìm kiếm, thông báo (F07–F08)
+- [x] Auth JWT, user, workspace, mời thành viên (F01–F03)
+- [x] Board, column, task, comment, API + giao diện (F04–F05)
+- [x] Kéo-thả + lưu thứ tự + WebSocket realtime (F06)
+- [x] Lọc, tìm kiếm, thông báo (F07–F08)
 - **Kiến thức cần nắm:** JWT hoạt động thế nào, băm mật khẩu bcrypt, WebSocket so với polling, cách lưu thứ tự thẻ khi kéo-thả
 
 ### Giai đoạn 3 – STT (Tuần 6–7: 21/12 – 03/01)
-- [ ] API upload + lưu file + tạo meeting (F09–F10)
-- [ ] Redis + RQ worker, cập nhật trạng thái, đẩy % tiến độ qua WebSocket
-- [ ] ffmpeg + faster-whisper, lưu segments (F11)
-- [ ] Giao diện xem/sửa bản ghi, phát audio theo đoạn (F12)
+- [x] API upload + lưu file + tạo meeting (F09–F10)
+- [x] Redis + RQ worker, cập nhật trạng thái, đẩy % tiến độ qua WebSocket
+- [x] ffmpeg + faster-whisper, lưu segments (F11)
+- [x] Giao diện xem/sửa bản ghi, phát audio theo đoạn (F12)
 - **Kiến thức cần nắm:** Whisper hoạt động thế nào (encoder–decoder Transformer, log-Mel spectrogram), VAD, lượng tử hóa int8, hàng đợi bất đồng bộ
 
 ### Giai đoạn 4 – LLM tóm tắt & trích xuất (Tuần 8–9: 04/01 – 17/01)
-- [ ] Thiết kế prompt + JSON schema, gọi Gemini (F13–F14)
-- [ ] Chunking cho bản ghi dài
-- [ ] Ghép tên (rapidfuzz) và chuẩn hóa ngày tiếng Việt (F15–F16)
-- [ ] Provider Ollama để so sánh
+- [x] Thiết kế prompt + JSON schema, gọi Gemini (F13–F14)
+- [x] Chunking cho bản ghi dài
+- [x] Ghép tên (rapidfuzz) và chuẩn hóa ngày tiếng Việt (F15–F16)
+- [x] Provider Ollama để so sánh
 - **Kiến thức cần nắm:** LLM là gì, prompt engineering, structured output, hallucination và cách giảm (trích dẫn câu gốc, con người duyệt)
 
-### Giai đoạn 5 – Duyệt & đẩy lên bảng (Tuần 10: 18/01 – 24/01) — làm sớm 17/11/2026
+### Giai đoạn 5 – Duyệt & đẩy lên bảng (Tuần 10: 18/01 – 24/01) — làm xong sớm 18/11/2026
 - [x] Màn hình duyệt, nút "Đẩy lên bảng" tạo nhiều task trong 1 transaction (F17)
 - [x] Truy vết thẻ ↔ cuộc họp + câu gốc (F18, phần truy vết)
 - [x] Giao việc theo tên (F20) + tự nhận tên, trưởng nhóm hoàn tác (F21) — xem mục 15–16
 - [ ] Lịch sử họp đầy đủ, xuất PDF/DOCX (F19) — để lượt sau
 
-### Giai đoạn 6 – Thực nghiệm (Tuần 11: 25/01 – 31/01)
+### Giai đoạn 6 – Phòng họp trực tuyến "Online Meeting" (thêm 18/11/2026, ước 2–3 tuần) — xem mục 17
+- [x] LiveKit (Docker) + HTTPS tự ký, phòng họp có cam / mic / chia sẻ màn hình chạy trong LAN
+- [x] Ghi âm riêng từng người, gửi dần lên máy chủ
+- [x] Ghép bản ghi có tên người nói, lọc tiếng vọng, đưa vào pipeline GĐ4
+- [x] Dùng tên người nói để giao việc "để em làm" cho đúng người
+- [ ] Thử với hai thiết bị thật trong cùng Wi-Fi (mic thật, cam, chia sẻ màn hình) — xem mục 10 của `GIAI_THICH_GIAI_DOAN_6.md`
+- **Kiến thức cần nắm:** WebRTC (SFU, ICE/STUN/TURN), vì sao trình duyệt bắt buộc HTTPS mới cho dùng cam / mic, JWT cấp quyền vào phòng, vì sao ghi riêng từng người thay cho tách người nói bằng AI (diarization)
+
+### Giai đoạn 7 – Thực nghiệm (Tuần 11: 25/01 – 31/01)
 - [ ] Thu, gán nhãn dữ liệu, viết script đánh giá, chạy 3 thí nghiệm, vẽ biểu đồ
+- [ ] Thí nghiệm 4 (mới): độ đúng người làm khi bản ghi **có / không có nhãn người nói**
 - **Kiến thức cần nắm:** WER, Precision / Recall / F1, cách đọc và giải thích kết quả
 
-### Giai đoạn 7 – Hoàn thiện (Tuần 12: 01/02 – 07/02)
+### Giai đoạn 8 – Hoàn thiện (Tuần 12: 01/02 – 07/02)
 - [ ] Kiểm thử (pytest cho backend, kiểm thử thủ công theo kịch bản), sửa lỗi
 - [ ] Seed dữ liệu demo, quay video demo dự phòng
 - [ ] (Tuỳ chọn) deploy: Vercel + Render + Neon, STT qua Groq
 
-### Giai đoạn 8 – Báo cáo & bảo vệ (Tuần 13–14: 08/02 – 21/02)
+### Giai đoạn 9 – Báo cáo & bảo vệ (Tuần 13–14: 08/02 – 21/02)
 - [ ] Viết báo cáo, làm slide, luyện bộ câu hỏi bảo vệ (mục 10)
 
-> Tết Nguyên đán 2027 rơi vào khoảng 06/02/2027, nên giai đoạn 7–8 có thể bị lùi. Nên làm nhanh giai đoạn 2–5 để có dư thời gian.
+> Tết Nguyên đán 2027 rơi vào khoảng 06/02/2027, nên giai đoạn 8–9 có thể bị lùi. Nên làm nhanh giai đoạn 2–5 để có dư thời gian.
 
 ---
 
@@ -353,7 +362,7 @@ Gửi email qua Gmail SMTP (miễn phí). Không gửi email cho mọi thay đ�
 | Người nói **tự nhận việc** ("để em làm", "phần này anh lo") mà bản ghi không cho biết ai nói | **Để trống người làm**, giữ đại từ gốc, đánh dấu "người nói tự nhận"; người dùng chọn ở màn hình duyệt (GĐ5). Không mặc định gán cho người tạo cuộc họp |
 | **Một việc giao nhiều người** ("Lan và Minh làm slide") | **Tách mỗi người một đầu việc** |
 | **Hạn chót mơ hồ** | Ước lượng theo quy ước cố định và gắn cờ "ước lượng": cuối tuần = **Chủ nhật**, đầu tuần = thứ Hai, cuối tháng = ngày cuối tháng |
-| **Ollama** (máy chưa cài) | Viết provider + test giả lập ở GĐ4; chạy thật và so sánh với Gemini ở GĐ6 |
+| **Ollama** (máy chưa cài) | Viết provider + test giả lập ở GĐ4; chạy thật và so sánh với Gemini ở giai đoạn Thực nghiệm (GĐ7) |
 | **Gemini quá tải** (503/504, chờ 3–4 phút rồi lỗi) | Mô hình chính `gemini-3.5-flash`, **tự chuyển sang `gemini-3.5-flash-lite`** khi gặp 429/503/504/hết giờ. Thời gian chờ mỗi lần gọi giảm từ 180 xuống **60 giây** |
 | Đã chuyển sang dự phòng mà bản ghi còn nhiều đoạn | Dùng luôn mô hình dự phòng cho các đoạn còn lại; lần tóm tắt sau lại thử mô hình chính trước |
 | Báo cho người dùng khi dùng mô hình dự phòng | Có: gợi ý sau 20 giây chờ, thông báo lúc chuyển, nhãn "mô hình dự phòng" trên biên bản |
@@ -402,3 +411,45 @@ Chi tiết và lý do: `docs/GIAI_THICH_GIAI_DOAN_4.md`.
 | *(18/11, sau khi dùng thử)* Ai được kéo thả / sửa / xóa thẻ | **Người làm + người tạo thẻ + trưởng nhóm**. Thành viên khác chỉ xem và bình luận. Thẻ chưa có người làm / giao theo tên chữ: người tạo + trưởng nhóm. Thay cho thiết kế "ai cũng sửa được" của GĐ2 |
 
 Chi tiết và lý do: `docs/GIAI_THICH_GIAI_DOAN_5.md`.
+
+---
+
+## 17. Phòng họp trực tuyến "Online Meeting" — Giai đoạn 6 (18/11/2026)
+
+**Ý tưởng (do người làm khóa luận đề xuất):** họp ngay trong ứng dụng. Mỗi người vào phòng bằng tài khoản của mình và có **một luồng âm thanh riêng**, nên hệ thống biết chắc *ai nói câu nào* — đúng điểm yếu lớn nhất của bản ghi từ file ghi âm (GĐ4 phải để trống người làm khi gặp "để em làm").
+
+**Vị trí trong hệ thống:** đây là **nguồn cuộc họp thứ ba**, bên cạnh tải file và ghi âm trực tiếp — không thay thế hai nguồn kia (họp ngồi chung một phòng, hoặc đã quen Zoom / Meet thì vẫn tải file lên). Bảng Kanban, pipeline AI, màn hình duyệt, F20/F21 giữ nguyên.
+
+| Điểm | Quyết định |
+|---|---|
+| Triển khai bản đầu | **Demo trong mạng LAN.** LiveKit (máy chủ phòng họp, mã nguồn mở) chạy bằng Docker trên laptop; web, API và kết nối phòng họp đi qua **một địa chỉ** `https://<IP-laptop>:5173` |
+| HTTPS | Bắt buộc (trình duyệt chỉ cho dùng cam / mic trên https hoặc localhost). Dùng **chứng chỉ tự ký bằng OpenSSL**; mỗi máy lần đầu bấm "Nâng cao → Vẫn tiếp tục". Không dùng mkcert vì phải cài CA gốc vào Windows |
+| Ai được vào phòng | **Bắt buộc có tài khoản** (không có khách gõ tên). Riêng với phòng họp, điều này thay cho quyết định 16/11 "chỉ người tổ chức cần tài khoản" |
+| Người chưa ở trong nhóm mở link phòng | Đăng nhập / đăng ký xong **tự vào nhóm rồi vào phòng**, giống Google Meet |
+| Link phòng | **Mỗi buổi họp một link mới**; phòng kết thúc thì link hết dùng được |
+| Ai được mở phòng | **Mọi thành viên.** Người mở là **chủ phòng**: bấm "Bắt đầu ghi", "Kết thúc cho mọi người", và được duyệt đầu việc như "người tải cuộc họp lên" |
+| Nhóm đang có phòng mở | **Mỗi nhóm chỉ một phòng mở.** Thành viên vào sau chỉ thấy nút **"Tham gia phòng"**, bấm là vào thẳng; không tạo được phòng thứ hai |
+| Ai điều khiển phòng (ghi âm, kết thúc) | **Chủ phòng + trưởng nhóm.** Danh sách người tham gia hiện nhãn "Chủ phòng" / "Trưởng nhóm" để ai cũng hiểu vì sao người đó có nút |
+| Chủ phòng bấm "Rời phòng" *(18/11, sau khi thử 2 máy)* | **Hỏi lại như Google Meet**: "Chỉ mình tôi rời" → quyền chủ phòng chuyển NGAY cho người vào sớm nhất còn lại; hoặc "Kết thúc cho mọi người". Chủ phòng là người cuối cùng → rời là kết thúc buổi họp |
+| Chủ phòng mất mạng / mất điện *(18/11)* | Phòng và ghi âm vẫn tiếp tục. Vắng **quá 1 phút** → nhượng quyền cho người vào sớm nhất còn lại (vào lại kịp thì vẫn là chủ phòng). Chủ phòng cũ vào lại sau đó là người tham gia thường — trừ khi là trưởng nhóm thì vẫn điều khiển được |
+| Ai duyệt đầu việc sau họp | **Chủ phòng lúc kết thúc** + trưởng nhóm |
+| Trước khi vào phòng | **Màn hình chờ** (xem trước hình, chọn mic / cam), mặc định **mic bật, cam tắt** |
+| Tên người nói trong bản ghi | **Họ tên đầy đủ** ("Nguyễn Văn Nam: …") — không nhầm khi trùng tên |
+| Phòng kết thúc khi nào | Chủ phòng bấm kết thúc, hoặc **tự đóng 30 giây sau khi mọi người rời hết** *(18/11, sau khi thử 2 máy: trước là 3 phút)*. |
+| Phòng được tạo lúc nào *(18/11, sau khi thử 2 máy)* | **Chỉ khi người mở bấm "Vào phòng"** ở màn hình chờ. Bấm "Online Meeting" rồi quay lại thì không có phòng nào được tạo (trước đó phòng được tạo ngay lúc bấm nút, để lại "phòng ma" làm người khác thấy nút "Tham gia phòng") |
+| Số người tối đa | **6** |
+| Trong phòng có gì | Cam, mic, chia sẻ màn hình, danh sách người tham gia. **Không** có chat, không có phụ đề trực tiếp |
+| Ghi gì | **Chỉ ghi âm, riêng từng người** (AI không dùng hình; ghi hình rất nặng) |
+| Bật ghi âm | **Chủ phòng bấm "Bắt đầu ghi"**; mọi người thấy chấm đỏ "Đang ghi âm" (minh bạch, quyền riêng tư) |
+| Ghi mấy lần | **Ghi một mạch**: bấm một lần, ghi tới khi chủ phòng bấm "Dừng ghi" hoặc kết thúc phòng. Đã dừng thì buổi đó không ghi lại |
+| Không ai bấm ghi | **Không tạo cuộc họp** trong danh sách. **Không hiện lời nhắc "chưa ghi âm"** — có khi mọi người chỉ gọi nói chuyện, không cần biên bản |
+| Cách ghi | **Trình duyệt mỗi người tự ghi mic của mình** (dùng lại bộ ghi âm GĐ3) và **gửi dần lên máy chủ ngay trong lúc họp**. Tắt mic thì đoạn đó là khoảng lặng, mốc thời gian vẫn chạy liên tục |
+| Thiếu ghi âm của một người | Phòng kết thúc → **chờ tối đa 2 phút** rồi nhận dạng với những gì đã có, trang cuộc họp ghi "Thiếu ghi âm của …". Phần đến muộn **tự bổ sung** vào bản ghi; nếu bản ghi đã bị sửa tay hoặc đã tóm tắt thì không tự ghi đè mà hiện nút cho người duyệt bấm |
+| Sau khi họp xong | **Tự động chuyển giọng nói → văn bản**, bản ghi dạng "Nam: …", "Lan: …". **Tóm tắt vẫn bấm tay** |
+| Dùng nhãn người nói | Câu **"để em làm" được giao cho chính người nói** (GĐ4 phải để trống). GĐ7 thêm thí nghiệm có / không có nhãn người nói |
+| Tiếng vọng (nghe loa ngoài, mic thu lại tiếng người khác) | **Có bước lọc**: hai người có câu gần giống nhau ở cùng thời điểm → giữ một bản, của người nói gốc |
+| Tên nguồn cuộc họp | **"Online Meeting"** |
+
+**Chưa làm ở bản đầu (hướng phát triển):** cho người ở xa họp thật (cần máy chủ có IP công khai / LiveKit Cloud + Cloudflare Tunnel), ghi hình, chat, phụ đề trực tiếp.
+
+Chi tiết và lý do: `docs/GIAI_THICH_GIAI_DOAN_6.md`.

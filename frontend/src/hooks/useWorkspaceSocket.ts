@@ -31,6 +31,18 @@ export function useWorkspaceSocket(workspaceId: number | undefined) {
       qc.invalidateQueries({ queryKey: ['meeting'] })
       return
     }
+    if (msg.type === 'room_updated') {
+      // GĐ6: có người mở / kết thúc phòng Online Meeting, hoặc bật / dừng ghi âm
+      qc.invalidateQueries({ queryKey: ['room', workspaceId] })
+      qc.invalidateQueries({ queryKey: ['room-info'] })
+      qc.invalidateQueries({ queryKey: ['meetings', workspaceId] })
+      return
+    }
+    if (msg.type === 'members_updated') {
+      // Có người vào nhóm qua link phòng họp
+      qc.invalidateQueries({ queryKey: ['workspace', workspaceId] })
+      return
+    }
     if (msg.type !== 'meeting_updated') return
 
     const patch = (m: Meeting) =>
