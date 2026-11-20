@@ -53,6 +53,9 @@ def create_join_token(room: str, user_id: int, display_name: str) -> str:
                 "canPublish": True,
                 "canSubscribe": True,
                 "canPublishData": False,  # không có chat
+                # Giơ tay ✋: mỗi người tự đặt thuộc tính `hand` của CHÍNH mình (participant attributes).
+                # Không ảnh hưởng bản ghi: tên người nói lấy từ tài khoản ở backend, không lấy tên trong LiveKit.
+                "canUpdateOwnMetadata": True,
             },
         },
         JOIN_TOKEN_TTL,

@@ -169,6 +169,7 @@ def test_join_gives_livekit_token(client):
     assert claims["iss"] == s.LIVEKIT_API_KEY and claims["sub"] == str(lan["_user"]["id"])
     assert claims["name"] == "Trần Thị Lan"
     assert claims["video"]["room"] == room["code"] and claims["video"]["roomJoin"] and claims["video"]["canPublish"]
+    assert claims["video"]["canUpdateOwnMetadata"] is True  # giơ tay = tự đặt thuộc tính của chính mình
 
 
 def test_room_link_adds_outsider_to_workspace(client):
