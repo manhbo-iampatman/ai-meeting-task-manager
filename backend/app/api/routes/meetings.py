@@ -1,7 +1,7 @@
 """F09–F18: tạo cuộc họp, tải ghi âm / văn bản, theo dõi xử lý, xem & sửa bản ghi, tóm tắt bằng AI,
 duyệt đầu việc và đẩy lên bảng."""
 
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.responses import FileResponse
@@ -10,12 +10,13 @@ from sqlalchemy import select
 from app.api.deps import DB, CurrentUser, ensure_member_user, get_board_for_member, get_membership
 from app.api.routes.boards import board_changed
 from app.core.database import SessionLocal
-from app.core.security import decode_access_token
+from app.core.security import create_scoped_token, decode_scoped_token
 from app.core.realtime import publish_event, workspace_room
 from app.ai.postprocess import speaker_merge
 from app.models import ExtractedTask, ExtractedTaskStatus, Meeting, MeetingStatus, MeetingTrack, User, WorkspaceMember
 from app.schemas.room import MeetingTrackOut
 from app.schemas.meeting import (
+    AudioTicketOut,
     ExtractedTaskOut,
     ExtractedTaskUpdate,
     MeetingDetail,
@@ -330,18 +331,36 @@ def push_to_board(meeting_id: int, data: PushIn, user: CurrentUser, db: DB, back
     return _detail(m, db, user)
 
 
+AUDIO_TICKET_TTL = timedelta(hours=12)  # đủ cho một buổi nghe lại dài; quá hạn thì tải lại trang
+
+
+@router.get("/meetings/{meeting_id}/audio-ticket", response_model=AudioTicketOut)
+def get_audio_ticket(meeting_id: int, user: CurrentUser, db: DB):
+    """Cấp "vé" nghe lại ghi âm (gọi bằng header Authorization như mọi API khác).
+
+    Vé chỉ mở được file ghi âm của ĐÚNG cuộc họp này, hết hạn sau 12 giờ. Trình duyệt đặt vé
+    vào link của thẻ <audio> thay cho token đăng nhập.
+    """
+    m = _get_meeting(db, meeting_id, user)
+    ticket = create_scoped_token(user.id, "audio", AUDIO_TICKET_TTL, mid=m.id)
+    return AudioTicketOut(url=f"/api/meetings/{m.id}/audio?ticket={ticket}")
+
+
 @router.get("/meetings/{meeting_id}/audio")
-def get_audio(meeting_id: int, token: str):
+def get_audio(meeting_id: int, ticket: str):
     """Phát lại file ghi âm.
 
-    Thẻ <audio> của trình duyệt không gửi được header Authorization → nhận token qua
-    query string. FileResponse hỗ trợ "Range request" nên tua được tới giữa file.
+    Thẻ <audio> của trình duyệt không gửi được header Authorization → nhận "vé nghe ghi âm"
+    (xem get_audio_ticket) qua query string. KHÔNG nhận token đăng nhập ở đây.
+    FileResponse hỗ trợ "Range request" nên tua được tới giữa file.
     """
-    user_id = decode_access_token(token)
-    if user_id is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Phiên đăng nhập không hợp lệ")
+    claims = decode_scoped_token(ticket, "audio")
+    if claims is None or claims.get("mid") != meeting_id:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Vé nghe ghi âm không hợp lệ hoặc đã hết hạn")
+    user_id = claims["sub"]
     with SessionLocal() as db:
         m = db.get(Meeting, meeting_id)
+        # Vẫn kiểm tra tư cách thành viên: người đã bị mời ra khỏi nhóm thì vé cũ hết tác dụng
         if m is None or db.get(WorkspaceMember, (m.workspace_id, user_id)) is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Không tìm thấy cuộc họp")
         path = svc.audio_abspath(m)

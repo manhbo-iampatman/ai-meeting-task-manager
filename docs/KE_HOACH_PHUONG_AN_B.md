@@ -457,3 +457,16 @@ Chi tiết và lý do: `docs/GIAI_THICH_GIAI_DOAN_5.md`.
 **Chưa làm ở bản đầu (hướng phát triển):** cho người ở xa họp thật (cần máy chủ có IP công khai / LiveKit Cloud + Cloudflare Tunnel), ghi hình, chat, phụ đề trực tiếp.
 
 Chi tiết và lý do: `docs/GIAI_THICH_GIAI_DOAN_6.md`.
+
+## 18. Rà soát bảo mật (20/11/2026)
+
+Rà soát code theo `CLAUDE.md` (mục 7 – Bảo mật) tìm ra 4 điểm cần sửa. Quyết định:
+
+| Vấn đề | Quyết định |
+| ------ | ---------- |
+| File ghi âm tải lên khai loại file giả (vd. `x.mp3` khai là trang web) → mã độc chạy khi đồng đội nghe lại (XSS) | **Server tự xác định loại file theo đuôi file**, không tin loại file trình duyệt khai báo; thêm header `X-Content-Type-Options: nosniff` |
+| Token đăng nhập nằm trên đường link (`?token=…`) → bị ghi vào log server | **Vé riêng + lọc log.** Nghe ghi âm: xin "vé" chỉ mở được đúng file của cuộc họp đó, hết hạn sau 12 giờ, không dùng thay token đăng nhập được. Realtime (WebSocket): link không có token, gửi token trong **tin nhắn đầu tiên** sau khi kết nối. Thêm bộ lọc che `token=` / `ticket=` trong log của uvicorn để phòng hờ |
+| Không giới hạn số lần đăng nhập sai → dò mật khẩu được | **5 lần sai / 15 phút → chặn 15 phút**, đếm theo cặp (email + IP) để kẻ xấu không khóa được tài khoản người khác. Bộ đếm giữ trong bộ nhớ backend (1 tiến trình). Vite gắn `X-Forwarded-For` để backend thấy IP thật |
+| `JWT_SECRET` còn là chuỗi mẫu / quá ngắn mà backend vẫn chạy | **Từ chối khởi động** nếu khóa là giá trị mẫu hoặc ngắn hơn 32 ký tự, kèm lệnh tạo khóa ngẫu nhiên |
+
+**Còn tồn tại (để GĐ8):** token đăng nhập sống 7 ngày, chưa thu hồi được trước hạn; chưa rà soát pháp lý dữ liệu cá nhân (Nghị định 13/2023/NĐ-CP, gửi bản ghi họp sang Gemini); backend chưa có lint (ruff), thư viện chưa ghim phiên bản, chưa có CI.

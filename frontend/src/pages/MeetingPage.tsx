@@ -5,8 +5,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   deleteMeeting,
   getMeeting,
+  getMeetingAudioUrl,
   getWorkspace,
-  meetingAudioUrl,
   mergeLateTrack,
   retryMeeting,
   summarizeMeeting,
@@ -22,7 +22,6 @@ import TranscriptView from '../components/meeting/TranscriptView'
 import { Button, ErrorText, Spinner } from '../components/ui'
 import { useWorkspaceSocket } from '../hooks/useWorkspaceSocket'
 import { errorMessage, formatBytes, formatClock, formatDate, formatDateTime } from '../lib/utils'
-import { useAuth } from '../stores/auth'
 
 const PROCESSING = new Set(['queued', 'transcribing', 'summarizing'])
 
@@ -134,7 +133,6 @@ function Pipeline({ m }: { m: MeetingDetail }) {
 
 export default function MeetingPage() {
   const id = Number(useParams().id)
-  const token = useAuth((s) => s.token)!
   const qc = useQueryClient()
   const navigate = useNavigate()
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -147,6 +145,14 @@ export default function MeetingPage() {
       const d = q.state.data
       return d && (PROCESSING.has(d.status) || (d.source_type === 'online' && d.status === 'uploaded')) ? 5000 : false
     },
+  })
+  // Link nghe lại ghi âm kèm "vé" riêng (hết hạn sau 12 giờ). Giữ nguyên link suốt lúc xem trang
+  // (staleTime: Infinity): đổi link giữa chừng thì thẻ <audio> sẽ phát lại từ đầu.
+  const { data: audioUrl } = useQuery({
+    queryKey: ['meeting-audio', id],
+    queryFn: () => getMeetingAudioUrl(id),
+    enabled: !!m?.has_audio,
+    staleTime: Infinity,
   })
   const live = useWorkspaceSocket(m?.workspace_id)
   // Thành viên + bảng của nhóm: để chọn người làm và chọn bảng khi duyệt đầu việc (GĐ5)
@@ -229,7 +235,8 @@ export default function MeetingPage() {
         <div className="min-w-0 space-y-4">
           {m.has_audio && (
             <div className="glass rounded-2xl border p-3">
-              <audio ref={audioRef} controls preload="metadata" src={meetingAudioUrl(m.id, token)} className="w-full" />
+              {/* Chưa có link thì vẫn hiện thẻ <audio> (không src) để thanh phát không "nhảy" bố cục */}
+              <audio ref={audioRef} controls preload="metadata" src={audioUrl} className="w-full" />
             </div>
           )}
 

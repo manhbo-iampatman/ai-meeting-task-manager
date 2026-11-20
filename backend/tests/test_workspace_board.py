@@ -199,11 +199,20 @@ def test_websocket_requires_membership(client):
     token_owner = owner["Authorization"].split()[1]
     token_stranger = stranger["Authorization"].split()[1]
 
+    # Token gửi trong tin nhắn đầu tiên, KHÔNG đặt trên link (link bị ghi vào log)
     with pytest.raises(WebSocketDisconnect):
-        with client.websocket_connect(f"/api/ws/boards/{board_id}?token={token_stranger}") as s:
+        with client.websocket_connect(f"/api/ws/boards/{board_id}") as s:
+            s.send_json({"type": "auth", "token": token_stranger})
+            s.receive_text()
+    # Token trên link kiểu cũ → không được tính, gửi tin nhắn khác "auth" → bị đóng
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect(f"/api/ws/boards/{board_id}?token={token_owner}") as s:
+            s.send_text("ping")
             s.receive_text()
 
-    with client.websocket_connect(f"/api/ws/boards/{board_id}?token={token_owner}") as s:
+    with client.websocket_connect(f"/api/ws/boards/{board_id}") as s:
+        s.send_json({"type": "auth", "token": token_owner})
+        assert s.receive_json() == {"type": "auth_ok"}
         col = client.get(f"/api/boards/{board_id}", headers=auth(owner)).json()["columns"][0]["id"]
         client.post(f"/api/boards/{board_id}/tasks", json={"column_id": col, "title": "Mới"}, headers=auth(owner))
         msg = s.receive_json()

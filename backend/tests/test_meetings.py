@@ -61,6 +61,13 @@ def _upload_audio(client, owner, ws, content=b"ID3fake-mp3-bytes" * 100, name="h
     )
 
 
+def _audio_url(client, user, meeting_id):
+    """Xin "vé" nghe ghi âm → link kèm vé (giống trình duyệt làm)."""
+    r = client.get(f"/api/meetings/{meeting_id}/audio-ticket", headers=auth(user))
+    assert r.status_code == 200, r.text
+    return r.json()["url"]
+
+
 def test_create_from_pasted_text(client):
     owner, ws = _setup(client)
     r = client.post(
@@ -109,16 +116,15 @@ def test_upload_audio_is_queued_and_playable(client, fake_queue):
     assert m["status"] == "queued" and m["has_audio"] and m["audio_size"] == len(content)
     assert fake_queue == [m["id"]]
 
-    token = owner["Authorization"].split()[1]
-    full = client.get(f"/api/meetings/{m['id']}/audio?token={token}")
+    url = _audio_url(client, owner, m["id"])
+    full = client.get(url)
     assert full.status_code == 200 and full.content == content
     # Range request → tua được tới giữa file
-    part = client.get(f"/api/meetings/{m['id']}/audio?token={token}", headers={"Range": "bytes=100-199"})
+    part = client.get(url, headers={"Range": "bytes=100-199"})
     assert part.status_code == 206 and part.content == content[100:200]
 
     stranger = register(client, "s@example.com")
-    t2 = stranger["Authorization"].split()[1]
-    assert client.get(f"/api/meetings/{m['id']}/audio?token={t2}").status_code == 404
+    assert client.get(f"/api/meetings/{m['id']}/audio-ticket", headers=auth(stranger)).status_code == 404
     assert client.get(f"/api/meetings/{m['id']}", headers=auth(stranger)).status_code == 404
 
     lst = client.get(f"/api/workspaces/{ws['id']}/meetings", headers=auth(owner)).json()
@@ -141,10 +147,10 @@ def test_audio_served_as_audio_even_if_upload_claims_html(client):
     )
     assert r.status_code == 201, r.text
     mid = r.json()["id"]
-    token = owner["Authorization"].split()[1]
+    url = _audio_url(client, owner, mid)
 
     def fetch():
-        res = client.get(f"/api/meetings/{mid}/audio?token={token}")
+        res = client.get(url)
         assert res.status_code == 200
         return res
 
@@ -158,6 +164,29 @@ def test_audio_served_as_audio_even_if_upload_claims_html(client):
         m.audio_mime = "text/html"
         db.commit()
     assert fetch().headers["content-type"] == "audio/mpeg"
+
+
+def test_audio_ticket_is_narrow(client):
+    """Vé nghe ghi âm chỉ mở được đúng 1 file; token đăng nhập không dùng được trên link nữa;
+    vé cũng không dùng thay token đăng nhập được."""
+    from urllib.parse import parse_qs, urlparse
+
+    owner, ws = _setup(client)
+    m1 = _upload_audio(client, owner, ws).json()["id"]
+    m2 = _upload_audio(client, owner, ws, name="hop-2.mp3").json()["id"]
+    url = _audio_url(client, owner, m1)
+    assert "token=" not in url
+    ticket = parse_qs(urlparse(url).query)["ticket"][0]
+    assert client.get(url).status_code == 200
+
+    # Vé của cuộc họp 1 không mở được cuộc họp 2
+    assert client.get(f"/api/meetings/{m2}/audio?ticket={ticket}").status_code == 401
+    # Token đăng nhập không còn được nhận trên link
+    login_token = owner["Authorization"].split()[1]
+    assert client.get(f"/api/meetings/{m1}/audio?ticket={login_token}").status_code == 401
+    assert client.get(f"/api/meetings/{m1}/audio?token={login_token}").status_code == 422  # thiếu ticket
+    # Vé lộ ra cũng không gọi được API khác (không chiếm được tài khoản)
+    assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {ticket}"}).status_code == 401
 
 
 def test_worker_job_success_with_member_names_prompt(client, monkeypatch):

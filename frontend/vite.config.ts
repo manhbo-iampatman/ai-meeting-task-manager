@@ -28,8 +28,10 @@ export default defineConfig(({ mode }) => {
       //   /api → backend FastAPI (cổng 8000). ws: true → cả WebSocket (cập nhật realtime).
       //   /rtc → LiveKit (cổng 7880): kênh "tín hiệu" của phòng họp. Hình / tiếng thì đi
       //          thẳng tới LiveKit qua UDP 7882, không qua Vite.
+      //   xfwd: true → gắn header X-Forwarded-For = IP thật của người dùng; thiếu nó thì backend
+      //   thấy mọi người đều là 127.0.0.1 (giới hạn đăng nhập sai sẽ chặn nhầm cả LAN).
       proxy: {
-        '/api': { target: 'http://localhost:8000', ws: true },
+        '/api': { target: 'http://localhost:8000', ws: true, xfwd: true },
         '/rtc': { target: 'http://localhost:7880', ws: true },
       },
     },

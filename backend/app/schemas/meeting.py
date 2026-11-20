@@ -143,3 +143,9 @@ class MeetingDetail(MeetingOut):
     can_review: bool = False  # người đang xem có được duyệt + đẩy lên bảng không
     # Online Meeting: ghi âm của từng người (ai chưa gửi đủ, ai có phần đến muộn chờ bổ sung)
     tracks: list[MeetingTrackOut] = []
+
+
+class AudioTicketOut(BaseModel):
+    """Link nghe lại ghi âm, đã kèm "vé" chỉ dùng được cho file này (xem get_audio_ticket)."""
+
+    url: str

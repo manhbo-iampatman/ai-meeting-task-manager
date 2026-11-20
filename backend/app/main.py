@@ -13,13 +13,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import auth, boards, health, meetings, names, notifications, realtime, rooms, tasks, workspaces
+from app.core import log_redact
 from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.core.realtime import redis_listener
+from app.core.security import check_jwt_secret
 from app.services import room_service
 
 settings = get_settings()
 logging.basicConfig(level=logging.INFO)
+check_jwt_secret(settings.JWT_SECRET)  # khóa ký JWT yếu → dừng ngay, không chạy
+log_redact.install()  # che token= / ticket= trong log của uvicorn
 
 
 ROOM_WATCH_INTERVAL = 5  # giây

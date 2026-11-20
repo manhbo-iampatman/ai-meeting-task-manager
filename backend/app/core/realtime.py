@@ -43,8 +43,8 @@ class ConnectionManager:
     def __init__(self) -> None:
         self.rooms: dict[str, set[WebSocket]] = defaultdict(set)
 
-    async def connect(self, room: str, ws: WebSocket) -> None:
-        await ws.accept()
+    def join(self, room: str, ws: WebSocket) -> None:
+        """Thêm kết nối (đã accept và đã xác thực xong) vào phòng."""
         self.rooms[room].add(ws)
 
     def disconnect(self, room: str, ws: WebSocket) -> None:

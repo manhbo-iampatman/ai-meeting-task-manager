@@ -161,6 +161,7 @@ export const uploadTrackChunk = (trackId: number, seq: number, chunk: Blob) =>
   )
 export const finishRoomTrack = (trackId: number) => data(api.post(`/room-tracks/${trackId}/finish`))
 
-/** Thẻ <audio> không gửi được header → đưa token vào URL. */
-export const meetingAudioUrl = (id: number, token: string) =>
-  `/api/meetings/${id}/audio?token=${encodeURIComponent(token)}`
+/** Thẻ <audio> không gửi được header → xin "vé" chỉ nghe được file này (hết hạn sau 12 giờ),
+ * trả về link đã kèm vé. Không đặt token đăng nhập lên link (link bị ghi vào log server). */
+export const getMeetingAudioUrl = (id: number) =>
+  data(api.get<{ url: string }>(`/meetings/${id}/audio-ticket`)).then((r) => r.url)

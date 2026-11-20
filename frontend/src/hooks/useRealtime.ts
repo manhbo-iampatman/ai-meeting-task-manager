@@ -3,6 +3,8 @@ import { useAuth } from '../stores/auth'
 
 /**
  * Kết nối WebSocket tới 1 "phòng" (vd. "boards/1", "workspaces/3").
+ * Token KHÔNG đặt trên đường link (link bị ghi vào log server): mở kết nối xong thì gửi token
+ * trong tin nhắn đầu tiên; server trả `auth_ok` mới tính là đã kết nối.
  * Mất kết nối thì tự kết nối lại sau 2, 4, 8… tối đa 15 giây (exponential backoff).
  * Trả về `true/false` = đang kết nối hay không.
  */
@@ -22,18 +24,24 @@ export function useRealtime(path: string | null, onMessage: (msg: Record<string,
 
     const connect = () => {
       const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-      ws = new WebSocket(`${proto}://${window.location.host}/api/ws/${path}?token=${encodeURIComponent(token)}`)
+      ws = new WebSocket(`${proto}://${window.location.host}/api/ws/${path}`)
       ws.onopen = () => {
-        attempt = 0
-        setConnected(true)
+        ws?.send(JSON.stringify({ type: 'auth', token }))
         ping = window.setInterval(() => ws?.readyState === WebSocket.OPEN && ws.send('ping'), 25000)
       }
       ws.onmessage = (ev) => {
+        let msg: Record<string, unknown>
         try {
-          handler.current(JSON.parse(ev.data))
+          msg = JSON.parse(ev.data)
         } catch {
-          /* bỏ qua tin nhắn lỗi */
+          return /* bỏ qua tin nhắn lỗi */
         }
+        if (msg.type === 'auth_ok') {
+          attempt = 0
+          setConnected(true)
+          return
+        }
+        handler.current(msg)
       }
       ws.onclose = () => {
         setConnected(false)

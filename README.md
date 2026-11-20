@@ -42,6 +42,8 @@ py -3.12 -m venv .venv
 pip install -r requirements.txt
 pip install -r requirements-ai.txt     # thư viện AI, ~2GB
 copy .env.example .env                 # rồi điền GEMINI_API_KEY, JWT_SECRET
+# JWT_SECRET phải là chuỗi ngẫu nhiên ≥ 32 ký tự, nếu không backend sẽ từ chối chạy. Tạo bằng:
+#   python -c "import secrets; print(secrets.token_urlsafe(48))"
 alembic upgrade head                   # tạo bảng trong CSDL
 python scripts\seed_demo.py            # (tuỳ chọn) dữ liệu demo — đăng nhập nam@example.com / demo1234
 

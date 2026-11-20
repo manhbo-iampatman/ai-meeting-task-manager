@@ -7,6 +7,8 @@ TEST_DB = "meetflow_test"
 os.environ["DATABASE_URL"] = f"postgresql+psycopg://meetflow:meetflow@localhost:5433/{TEST_DB}"
 # File upload trong lúc test ghi vào thư mục tạm, không lẫn với dữ liệu thật
 os.environ["UPLOAD_DIR"] = tempfile.mkdtemp(prefix="meetflow_test_uploads_")
+# Khóa JWT riêng cho test → test không phụ thuộc file backend/.env của từng máy
+os.environ["JWT_SECRET"] = "khoa-jwt-chi-dung-khi-chay-test-0123456789abcdef"
 
 import psycopg  # noqa: E402
 import pytest  # noqa: E402
@@ -38,6 +40,9 @@ def _schema():
 
 @pytest.fixture(autouse=True)
 def _clean_tables():
+    from app.core.rate_limit import login_limiter
+
+    login_limiter.reset()  # bộ đếm đăng nhập sai không được lan từ test này sang test khác
     yield
     names = ", ".join(t.name for t in Base.metadata.sorted_tables)
     with engine.begin() as conn:
