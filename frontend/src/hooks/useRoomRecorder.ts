@@ -1,12 +1,14 @@
+import axios from 'axios'
 import { useEffect, useRef, useState } from 'react'
 import { createRoomTrack } from '../api/endpoints'
 import type { RecordingState } from '../api/types'
 import { TrackUploader } from '../lib/roomTrackUploader'
 
-/** idle: không ghi · recording: đang ghi mic của mình · error: không ghi được (trình duyệt không hỗ trợ…) */
+/** idle: không ghi · recording: đang ghi mic của mình · error: không ghi được (trình duyệt không hỗ trợ hoặc lỗi mạng) */
 export type RoomRecorderState = 'idle' | 'recording' | 'error'
 
 const CHUNK_MS = 3000 // cứ 3 giây đóng một khúc và gửi lên máy chủ
+const MAX_CREATE_RETRIES = 5 // thử lại tối đa 5 lần (1s, 2s, 4s, 8s, 10s ≈ 25s) khi mạng chập chờn lúc mở track
 
 function pickMimeType(): string {
   const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4']
@@ -91,29 +93,64 @@ export function useRoomRecorder(code: string, recording: RecordingState, micTrac
 
     let uploader: TrackUploader | null = null
     let cancelled = false // đã dừng trước khi máy chủ kịp mở track
+    let recStopped = false // MediaRecorder đã dừng hẳn và phát xong khúc cuối
+    let retryTimer: number | null = null
     const early: Blob[] = [] // các khúc ghi được trong lúc chờ máy chủ mở track
     let startedAt = 0
+
+    const stopRecorder = () => {
+      if (rec.state !== 'inactive') rec.stop()
+      else recStopped = true
+    }
 
     rec.ondataavailable = (ev) => {
       if (!ev.data || ev.data.size === 0) return
       if (uploader) uploader.push(ev.data)
       else early.push(ev.data)
     }
+    rec.onstop = () => {
+      recStopped = true
+      void uploader?.close()
+    }
     rec.onstart = () => {
       startedAt = performance.now()
-      // Báo máy chủ: "máy ghi của tôi đã chạy được X mili giây" → máy chủ suy ra thời điểm bắt đầu
-      // theo đồng hồ CỦA NÓ. Mọi người đều quy về một đồng hồ nên lời nói xếp đúng thứ tự.
-      createRoomTrack(code, { mime: rec.mimeType || mimeType || 'audio/webm', elapsed_ms: Math.round(performance.now() - startedAt) })
-        .then((res) => {
-          uploader = new TrackUploader({ trackId: res.track_id, roomCode: code, acked: 0, closed: false, createdAt: Date.now() })
-          early.splice(0).forEach((b) => uploader!.push(b))
-          if (cancelled) void uploader.close()
-        })
-        .catch(() => {
-          // Phòng vừa dừng ghi / kết thúc đúng lúc mình bắt đầu → không có gì để gửi
-          if (rec.state !== 'inactive') rec.stop()
-          setState('idle')
-        })
+      const openTrack = (attempt: number) => {
+        if (cancelled) return
+        // Báo máy chủ: "máy ghi của tôi đã chạy được X mili giây" → máy chủ suy ra thời điểm bắt đầu
+        // theo đồng hồ CỦA NÓ. Tính lại ngay trước mỗi lần thử (kể cả khi retry) để không lệch giờ.
+        const elapsedMs = Math.round(performance.now() - startedAt)
+        createRoomTrack(code, { mime: rec.mimeType || mimeType || 'audio/webm', elapsed_ms: elapsedMs })
+          .then((res) => {
+            uploader = new TrackUploader({ trackId: res.track_id, roomCode: code, acked: 0, closed: false, createdAt: Date.now() })
+            early.splice(0).forEach((b) => uploader!.push(b))
+            // Chỉ đóng uploader nếu MediaRecorder ĐÃ phát xong khúc cuối; ngược lại `onstop` sẽ đóng
+            if (recStopped) void uploader.close()
+          })
+          .catch((err) => {
+            if (cancelled) return
+            const status = axios.isAxiosError(err) ? err.response?.status : undefined
+            if (status === 409 || status === 410) {
+              // Phòng vừa dừng ghi / kết thúc đúng lúc mình bắt đầu → dừng nhẹ nhàng, không báo lỗi
+              early.length = 0
+              stopRecorder()
+              setState('idle')
+              return
+            }
+            if (status === 401 || status === 403 || status === 404 || attempt >= MAX_CREATE_RETRIES) {
+              // Lỗi quyền hoặc mạng đứt quá lâu → dừng và hiện cảnh báo để người dùng biết
+              early.length = 0
+              stopRecorder()
+              setState('error')
+              return
+            }
+            const delay = Math.min(1000 * 2 ** attempt, 10000)
+            retryTimer = window.setTimeout(() => {
+              retryTimer = null
+              openTrack(attempt + 1)
+            }, delay)
+          })
+      }
+      openTrack(0)
     }
     rec.onerror = () => setState('error')
     void ctxRef.current?.resume().catch(() => {})
@@ -122,12 +159,15 @@ export function useRoomRecorder(code: string, recording: RecordingState, micTrac
 
     return () => {
       cancelled = true
-      const finish = () => void uploader?.close()
+      if (retryTimer !== null) {
+        window.clearTimeout(retryTimer)
+        retryTimer = null
+      }
       if (rec.state !== 'inactive') {
-        rec.addEventListener('stop', finish, { once: true }) // khúc cuối được đẩy ra TRƯỚC sự kiện stop
-        rec.stop()
+        rec.stop() // khúc cuối được đẩy ra TRƯỚC sự kiện stop → `onstop` đóng uploader
       } else {
-        finish()
+        recStopped = true
+        void uploader?.close()
       }
       setState('idle')
     }

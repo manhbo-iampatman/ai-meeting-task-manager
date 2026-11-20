@@ -234,9 +234,79 @@ def test_find_evidence():
     assert find_evidence("Duy mua bánh sinh nhật cho cả nhóm nhé.", SEGMENTS)[1] < 85
     # Trích dẫn quá ngắn không được "khớp" bừa vào một câu dài
     assert find_evidence("nhé", SEGMENTS)[1] < 85
-    # Whisper cắt 1 câu thành 2 dòng → vẫn tìm ra khi ghép 2 dòng liền nhau
+    # Whisper cắt 1 câu thành 2 dòng → vẫn tìm ra khi ghép 2 dòng liền nhau (không có nhãn / cùng người nói)
     split = [{"start": 0.0, "text": "Lan viết chương hai,"}, {"start": 2.0, "text": "nộp trước thứ Sáu tuần này nhé."}]
     assert find_evidence(LINES[1], split) == (0, 100)
+    same_sp = [
+        {"start": 0.0, "text": "Lan viết chương hai,", "speaker_id": 1, "speaker": "Nguyễn Văn Nam"},
+        {"start": 2.0, "text": "nộp trước thứ Sáu tuần này nhé.", "speaker_id": 1, "speaker": "Nguyễn Văn Nam"},
+    ]
+    assert find_evidence(LINES[1], same_sp) == (0, 100)
+    # Online Meeting: KHÔNG ghép 2 câu của HAI người nói khác nhau (tránh gán nhầm người nói)
+    diff_sp = [
+        {"start": 0.0, "text": "Phần slide thì ai nhận?", "speaker_id": 1, "speaker": "Nguyễn Văn Nam"},
+        {"start": 2.0, "text": "Để em làm phần đó ạ.", "speaker_id": 2, "speaker": "Trần Thị Lan"},
+    ]
+    _, cross_score = find_evidence("Phần slide thì ai nhận? Để em làm phần đó ạ.", diff_sp)
+    # Không khớp bằng cách nối xuyên qua 2 người nói; nếu câu dài không khớp riêng từng câu đủ cao thì không trả nhầm cặp
+    i_cross, _ = find_evidence("ai nhận Để em làm phần", diff_sp)
+    assert i_cross is None or find_evidence("ai nhận Để em làm phần", diff_sp)[1] < 85
+
+
+def test_quote_spanning_two_speakers_does_not_use_speaker_label():
+    """LLM chép gộp câu hỏi của Nam + câu nhận việc của Lan → câu bằng chứng không rõ của ai →
+    KHÔNG gắn nhãn "người nói tự nhận" (bản cũ: trả về câu của Nam, rồi gán nhãn speaker cho Nam)."""
+    from app.ai.extraction import quote_speakers
+
+    nam, lan = {"speaker_id": 1, "speaker": "Nguyễn Văn Nam"}, {"speaker_id": 2, "speaker": "Trần Thị Lan"}
+    segs = [
+        {"start": 0.0, "end": 2.0, "text": "Phần slide báo cáo thì ai nhận làm?", **nam},
+        {"start": 2.1, "end": 4.0, "text": "Để em làm phần slide đó ạ.", **lan},
+    ]
+    both = "Phần slide báo cáo thì ai nhận làm? Để em làm phần slide đó ạ."
+    i, _ = find_evidence(both, segs)
+    assert quote_speakers(both, segs, i) == {1, 2}
+    assert quote_speakers("Để em làm phần slide đó ạ.", segs, 1) == {2}  # chép đúng 1 câu → biết chắc là Lan
+
+
+def test_dedupe_merges_same_assignee_with_different_name_spellings():
+    """Cùng một tài khoản (Online Meeting tự nhận "Nguyễn Văn Nam" + chốt cuối buổi "Nam") → phải gộp thành 1 việc."""
+    spoken = [
+        {"start": 0.0, "end": 4.0, "text": "Còn phần anh, anh sẽ chuẩn bị bộ dữ liệu thử nghiệm.", "speaker_id": 1, "speaker": "Nguyễn Văn Nam"},
+        {"start": 20.0, "end": 24.0, "text": "Chốt lại anh Nam chuẩn bị bộ dữ liệu thử nghiệm trước thứ Tư tuần sau nhé.", "speaker_id": 2, "speaker": "Trần Thị Lan"},
+    ]
+    llm = FakeLLM([
+        {
+            "summary": summary(),
+            "action_items": [
+                item("Chuẩn bị bộ dữ liệu thử nghiệm", ["Nguyễn Văn Nam"], "", "Còn phần anh, anh sẽ chuẩn bị bộ dữ liệu thử nghiệm."),
+                item("Chuẩn bị bộ dữ liệu thử nghiệm", ["Nam"], "thứ Tư tuần sau", "Chốt lại anh Nam chuẩn bị bộ dữ liệu thử nghiệm trước thứ Tư tuần sau nhé."),
+                # Người chưa có tài khoản được gọi "anh Duy" rồi "Duy" → cũng gộp
+                item("Gửi tài liệu tham khảo", ["anh Duy"], "", ""),
+                item("Gửi tài liệu tham khảo", ["Duy"], "ngày mai", ""),
+            ],
+        }
+    ])
+    r = extract_meeting(llm, spoken, MEETING_DATE, MEMBERS)
+    assert len(r.items) == 2
+    nam_task, duy_task = r.items
+    assert (nam_task.assignee_id, nam_task.assignee_match, nam_task.due_date) == (1, "speaker", date(2026, 11, 25))
+    assert (duy_task.assignee_id, duy_task.due_date) == (None, date(2026, 11, 17))
+
+
+def test_cross_speaker_quote_is_not_labelled_self_claim():
+    """Đầu cuối: LLM gán việc cho Nam và chép gộp câu hỏi của Nam + câu nhận việc của Lan.
+    Bản cũ: câu bằng chứng trả về câu của Nam → gắn nhãn "speaker" (người nói tự nhận, điểm 100)
+    cho Nam dù chính Lan mới là người nhận. Giờ: không biết chắc → chỉ ghép tên như GĐ4."""
+    spoken = [
+        {"start": 0.0, "end": 2.0, "text": "Phần slide báo cáo thì ai nhận làm?", "speaker_id": 1, "speaker": "Nguyễn Văn Nam"},
+        {"start": 2.1, "end": 4.0, "text": "Để em làm phần slide đó ạ.", "speaker_id": 2, "speaker": "Trần Thị Lan"},
+    ]
+    llm = FakeLLM([{"summary": summary(), "action_items": [
+        item("Làm slide báo cáo", ["Nguyễn Văn Nam"], "", "Phần slide báo cáo thì ai nhận làm? Để em làm phần slide đó ạ."),
+    ]}])
+    t = extract_meeting(llm, spoken, MEETING_DATE, MEMBERS).items[0]
+    assert t.evidence_found and t.assignee_match != "speaker"
 
 
 # ---------------- Chia đoạn ----------------

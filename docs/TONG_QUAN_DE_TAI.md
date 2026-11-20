@@ -145,7 +145,7 @@ Ký hiệu: ✅ đã làm xong · 🔜 đang / sắp làm · 💡 mở rộng n�
 | Trích xuất đầu việc (cuộc họp mẫu, Gemini) | **4/4 đầu việc**, đúng hạn chót 4/4, câu gốc tìm thấy 4/4; 1 việc người nói tự nhận được cố ý để trống người làm |
 | Thời gian tóm tắt | Khoảng **11–19 giây** cho cuộc họp 85 giây |
 | Online Meeting (3 người, ghi âm riêng dựng từ cuộc họp mẫu) | Gán đúng người nói **19/19 câu**; lọc đúng **12/12 câu tiếng vọng**; người vào muộn 10 giây vẫn đúng mốc thời gian; câu "anh sẽ chuẩn bị bộ dữ liệu" được giao cho đúng người nói |
-| Kiểm thử tự động | 167 test |
+| Kiểm thử tự động | 192 test |
 
 ## 8. Điểm nhấn khi bảo vệ
 

@@ -29,7 +29,7 @@ from app.ai.llm.prompts import (
     build_reduce_prompt,
     build_user_prompt,
 )
-from app.ai.postprocess.name_matching import MemberInfo, NameMatch, match_name, split_assignees
+from app.ai.postprocess.name_matching import MemberInfo, NameMatch, match_name, split_assignees, strip_honorific
 from app.ai.postprocess.text_utils import norm, norm_no_accent
 from app.ai.postprocess.vi_date_parser import parse_due
 
@@ -137,6 +137,32 @@ class ExtractionResult:
 # ---------- Tìm câu trích dẫn trong bản ghi ----------
 
 
+def quote_speakers(quote: str, segments: list[dict[str, Any]], around: int | None, window: float = 8.0) -> set[Any]:
+    """Những người nói có câu (đủ dài) nằm TRỌN trong câu trích dẫn, quanh vị trí `around`.
+
+    LLM đôi khi chép gộp câu hỏi của người này với câu nhận việc của người kia ("Phần slide
+    thì ai nhận? Để em làm ạ."). Khi đó từng câu riêng đều khớp một phần 100% → không biết
+    chắc câu bằng chứng là của ai → KHÔNG được dùng nhãn người nói để gán việc.
+    """
+    if around is None:
+        return set()
+    q = norm_no_accent(quote)
+    t0 = segments[around].get("start")
+    out: set[Any] = set()
+    for s in segments:
+        c = norm_no_accent(str(s.get("text", "")))
+        if len(c) < 12 or s.get("speaker_id") is None:
+            continue
+        st = s.get("start")
+        if t0 is not None and st is not None and abs(float(st) - float(t0)) > window:
+            continue
+        if fuzz.partial_ratio(c, q) >= 95 and len(c) < len(q):
+            out.add(s.get("speaker_id"))
+    out.add(segments[around].get("speaker_id"))
+    out.discard(None)
+    return out
+
+
 def find_evidence(quote: str, segments: list[dict[str, Any]]) -> tuple[int | None, int]:
     """Tìm câu trong bản ghi giống `quote` nhất → (vị trí câu, điểm 0–100).
 
@@ -169,8 +195,18 @@ def find_evidence(quote: str, segments: list[dict[str, Any]]) -> tuple[int | Non
     found = best_of(texts)
     if found[1] >= EVIDENCE_THRESHOLD:
         return found
-    # ...không được thì mới thử ghép 2 câu liền nhau
-    pairs = [f"{texts[i]} {texts[i + 1]}" if texts[i] and texts[i + 1] else "" for i in range(len(texts) - 1)]
+    # ...không được thì mới thử ghép 2 câu liền nhau (chỉ ghép khi CÙNG người nói để tránh
+    # gán nhầm `said_by` sang người nói câu trước trong Online Meeting). Lưu ý: vì đã so khớp
+    # MỘT PHẦN ở trên nên bước này hiếm khi cần; trường hợp LLM chép gộp lời của 2 người do
+    # `quote_speakers` xử lý.
+    def same_speaker(i: int, j: int) -> bool:
+        a, b = segments[i], segments[j]
+        return a.get("speaker_id") == b.get("speaker_id") and a.get("speaker") == b.get("speaker")
+
+    pairs = [
+        f"{texts[i]} {texts[i + 1]}" if texts[i] and texts[i + 1] and same_speaker(i, i + 1) else ""
+        for i in range(len(texts) - 1)
+    ]
     paired = best_of(pairs)
     return paired if paired[1] > found[1] else found
 
@@ -234,8 +270,11 @@ def _postprocess(
         seg_i, score = find_evidence(evidence, segments)
         found = score >= EVIDENCE_THRESHOLD
         start = segments[seg_i].get("start") if found and seg_i is not None else None
-        # Online Meeting: ai là người NÓI câu bằng chứng (biết chắc, vì mỗi người ghi bằng mic của mình)
+        # Online Meeting: ai là người NÓI câu bằng chứng (biết chắc, vì mỗi người ghi bằng mic của mình).
+        # Câu trích dẫn gộp lời của 2 người trở lên → không biết chắc → không dùng nhãn người nói.
         said_by = segments[seg_i].get("speaker_id") if speakers and found and seg_i is not None else None
+        if said_by is not None and len(quote_speakers(evidence, segments, seg_i)) > 1:
+            said_by = None
         for name in names:
             # LLM chép đúng nhãn người nói ở đầu dòng → biết chắc tài khoản, không cần so khớp mờ.
             # Còn lại ghép tên như GĐ4.
@@ -281,15 +320,26 @@ def same_task(a: str, b: str) -> bool:
     return fuzz.token_set_ratio(na, nb) >= DUPLICATE_THRESHOLD
 
 
+def _assignee_key(it: ExtractedItem) -> tuple[str, int | str]:
+    """Khóa nhận diện người làm khi gộp trùng: ưu tiên `assignee_id` nếu đã ghép được tài khoản.
+
+    Trong Online Meeting, câu tự nhận ghi họ tên đầy đủ ("Nguyễn Văn Nam") còn câu chốt cuối
+    buổi chỉ ghi tên gọi ("Nam") — cả hai cùng `assignee_id` nên phải được coi là một người.
+    """
+    if it.assignee_id is not None:
+        return ("id", it.assignee_id)
+    return ("name", norm_no_accent(strip_honorific(it.raw_assignee or "")))
+
+
 def _dedupe(items: list[ExtractedItem]) -> list[ExtractedItem]:
     """Gộp đầu việc trùng (cùng người làm, cùng việc). Xảy ra khi cuối họp nhắc lại
     ("chốt lại: Lan viết chương hai...") hoặc khi 2 đoạn gối đầu cùng trích một việc.
     Giữ bản mô tả đầy đủ hơn; bản nào có hạn chót thì lấy hạn chót."""
     kept: list[ExtractedItem] = []
     for it in items:
-        who = norm_no_accent(it.raw_assignee or "")
+        who = _assignee_key(it)
         dup = next(
-            (k for k in kept if norm_no_accent(k.raw_assignee or "") == who and same_task(k.title, it.title)),
+            (k for k in kept if _assignee_key(k) == who and same_task(k.title, it.title)),
             None,
         )
         if dup is None:
@@ -297,12 +347,15 @@ def _dedupe(items: list[ExtractedItem]) -> list[ExtractedItem]:
             continue
         if len(it.title) > len(dup.title):  # bản sau mô tả đầy đủ hơn → lấy tiêu đề + câu gốc của nó
             dup.title = it.title
-            dup.evidence_quote, dup.evidence_found = it.evidence_quote, it.evidence_found
-            dup.evidence_segment, dup.evidence_start = it.evidence_segment, it.evidence_start
+            if it.evidence_found or not dup.evidence_found:
+                dup.evidence_quote, dup.evidence_found = it.evidence_quote, it.evidence_found
+                dup.evidence_segment, dup.evidence_start = it.evidence_segment, it.evidence_start
             if it.due_date is not None:
                 dup.due_text, dup.due_date, dup.due_approximate = it.due_text, it.due_date, it.due_approximate
         elif dup.due_date is None and it.due_date is not None:  # bản trùng có hạn chót → lấy hạn chót
             dup.due_text, dup.due_date, dup.due_approximate = it.due_text, it.due_date, it.due_approximate
+        if it.assignee_match == "speaker" and dup.assignee_match != "speaker":
+            dup.assignee_match, dup.assignee_score = it.assignee_match, it.assignee_score
         if it.priority == "high":
             dup.priority = "high"
     return kept

@@ -22,6 +22,7 @@ tham_khao/
 backend/uploads/
 backend/models_cache/
 experiments/data/
+experiments/results/cache/
 *.wav
 *.mp3
 *.m4a

@@ -1,4 +1,4 @@
-"""Tính WER (Word Error Rate — tỉ lệ lỗi từ) của bản ghi so với đáp án chuẩn.
+"""Tính WER (Word Error Rate — tỉ lệ lỗi từ) và CER của bản ghi so với đáp án chuẩn.
 
     WER = (S + D + I) / N
       S: số từ bị thay (nghe "bản" thay vì "bảng")
@@ -6,60 +6,41 @@
       I: số từ bị chèn thừa
       N: tổng số từ của bản chuẩn
 
-Có 2 cách tính:
+Báo cáo cả 2 cách tính cho minh bạch:
   - WER thô: so nguyên văn (chỉ bỏ dấu câu, chữ hoa).
-  - WER chuẩn hóa: đổi chữ số thành chữ ("25" → "hai mươi lăm") trước khi so,
+  - WER chuẩn hóa số: đổi chữ số / ngày "25/11" / giờ "9h30" / "50%" / "2.000" sang chữ đọc chuẩn và
+    quy các cách đọc tương đương (tư/bốn, mốt/một, lẻ/linh, nghìn/ngàn) ở CẢ HAI phía trước khi so,
     vì Whisper hay viết số bằng chữ số — về nghĩa thì KHÔNG sai.
-  → Báo cáo cả 2 cho minh bạch.
 
 Cách dùng:
-  python experiments/eval_wer.py reference.txt hypothesis.txt
-  python experiments/eval_wer.py --meeting 2 experiments/data/sample_meeting_01/reference.txt
-     (lấy bản ghi của cuộc họp id=2 từ API đang chạy, đăng nhập bằng tài khoản demo)
+  backend\\.venv\\Scripts\\python experiments\\eval_wer.py reference.txt hypothesis.txt
+  backend\\.venv\\Scripts\\python experiments\\eval_wer.py --meeting 2 experiments/data/sample_meeting_01/reference.txt
+  backend\\.venv\\Scripts\\python experiments\\eval_wer.py reference.txt hypothesis.txt --expected experiments/data/sample_meeting_01/expected_tasks.json
 """
 
+from __future__ import annotations
+
 import argparse
-import re
-import sys
-import unicodedata
 from pathlib import Path
+import sys
 
-import jiwer
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-sys.stdout.reconfigure(encoding="utf-8")
+import jiwer  # noqa: E402
+from common import (  # noqa: E402
+    compute_wer_metrics,
+    fmt_pct,
+    load_meeting,
+    normalize_for_wer,
+    read_text,
+    number_to_vi,  # giữ export cho các script khác nếu import từ eval_wer
+)
 
-DIGITS = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"]
-
-
-def number_to_vi(n: int) -> str:
-    """Đọc số 0–999 theo tiếng Việt (đủ cho ngày, giờ, số lượng trong cuộc họp)."""
-    if n < 10:
-        return DIGITS[n]
-    if n < 20:
-        u = n % 10
-        return "mười" + ("" if u == 0 else " lăm" if u == 5 else " " + DIGITS[u])
-    if n < 100:
-        t, u = divmod(n, 10)
-        tail = "" if u == 0 else " mốt" if u == 1 else " tư" if u == 4 else " lăm" if u == 5 else " " + DIGITS[u]
-        return f"{DIGITS[t]} mươi{tail}"
-    if n < 1000:
-        h, r = divmod(n, 100)
-        if r == 0:
-            return f"{DIGITS[h]} trăm"
-        if r < 10:
-            return f"{DIGITS[h]} trăm lẻ {DIGITS[r]}"
-        return f"{DIGITS[h]} trăm {number_to_vi(r)}"
-    return str(n)
+__all__ = ["number_to_vi", "normalize", "evaluate"]
 
 
 def normalize(text: str, numbers: bool) -> str:
-    t = unicodedata.normalize("NFC", text.lower())
-    t = re.sub(r"[^\w\s]", " ", t)
-    if numbers:
-        t = re.sub(r"\d+", lambda m: number_to_vi(int(m.group())), t)
-        # "thứ tư" hay được đọc là "thứ bốn" khi chuyển ngược → quy về "tư"
-        t = re.sub(r"\bthứ bốn\b", "thứ tư", t)
-    return re.sub(r"\s+", " ", t).strip()
+    return normalize_for_wer(text, numbers=numbers)
 
 
 def evaluate(ref: str, hyp: str, numbers: bool) -> jiwer.WordOutput:
@@ -76,27 +57,48 @@ def show(title: str, o: jiwer.WordOutput) -> None:
             print(f"    {a.type:10s} chuẩn: '{r}'  →  nghe: '{h}'")
 
 
-def fetch_meeting_text(meeting_id: int) -> str:
+def fetch_meeting_text(meeting_id: int, base: str = "http://localhost:8000/api") -> str:
+    """Lấy bản ghi từ API đang chạy (tài khoản demo của seed). Ghép NỘI DUNG từng câu, KHÔNG dùng
+    `full_text` vì với Online Meeting `full_text` có tiền tố "Tên người nói:" → bị tính là từ chèn thừa."""
     import httpx
 
-    base = "http://localhost:8000/api"
     tok = httpx.post(f"{base}/auth/login", json={"email": "nam@example.com", "password": "demo1234"}).json()["access_token"]
     d = httpx.get(f"{base}/meetings/{meeting_id}", headers={"Authorization": f"Bearer {tok}"}).json()
+    segs = d["transcript"].get("segments") or []
+    if segs:
+        return "\n".join(str(s.get("text", "")).strip() for s in segs if str(s.get("text", "")).strip())
     return d["transcript"]["full_text"]
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("reference")
-    ap.add_argument("hypothesis", nargs="?")
-    ap.add_argument("--meeting", type=int, help="lấy bản ghi từ cuộc họp id này (API phải đang chạy)")
+    ap = argparse.ArgumentParser(description="Tính WER / CER của bản ghi STT so với đáp án chuẩn")
+    ap.add_argument("reference", help="File bản ghi chuẩn (reference.txt)")
+    ap.add_argument("hypothesis", nargs="?", help="File bản ghi cần chấm")
+    ap.add_argument("--meeting", type=int, help="Lấy bản ghi từ cuộc họp id này trên API đang chạy")
+    ap.add_argument("--expected", help="File expected_tasks.json (để đo thêm tỉ lệ nhận đúng tên thành viên)")
     a = ap.parse_args()
 
-    ref = Path(a.reference).read_text(encoding="utf-8")
-    hyp = fetch_meeting_text(a.meeting) if a.meeting else Path(a.hypothesis).read_text(encoding="utf-8")
-    show("WER thô        ", evaluate(ref, hyp, numbers=False))
+    if not a.meeting and not a.hypothesis:
+        ap.error("Cần truyền file `hypothesis` hoặc `--meeting <id>`")
+
+    ref_path = Path(a.reference)
+    ref = read_text(ref_path)
+    hyp = fetch_meeting_text(a.meeting) if a.meeting else read_text(Path(a.hypothesis))
+
+    show("WER thô         ", evaluate(ref, hyp, numbers=False))
     print()
     show("WER chuẩn hóa số", evaluate(ref, hyp, numbers=True))
+
+    members = None
+    if a.expected:
+        members = load_meeting(Path(a.expected).parent).members
+    elif (ref_path.parent / "expected_tasks.json").exists():
+        members = load_meeting(ref_path.parent).members
+
+    m = compute_wer_metrics(ref, hyp, members=members)
+    print(f"\nCER chuẩn hóa số : {fmt_pct(m.cer_norm, 2)}")
+    if m.name_total > 0:
+        print(f"Đúng tên thành viên: {m.name_hits}/{m.name_total} ({fmt_pct(m.name_accuracy, 1)})")
 
 
 if __name__ == "__main__":

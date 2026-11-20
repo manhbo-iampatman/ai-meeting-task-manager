@@ -38,38 +38,62 @@ def track_offset(track: MeetingTrack, room: MeetingRoom) -> float:
     return max(0.0, (track.started_at - room.recording_started_at).total_seconds())
 
 
-def transcribe_track(stt, track: MeetingTrack, room: MeetingRoom, prompt: str | None, on_progress=None):
+def transcribe_track(stt, track: MeetingTrack, room: MeetingRoom, prompt: str | None, on_progress=None) -> str | None:
     """Nhận dạng ghi âm của MỘT người → lưu các câu (đã dời lên trục thời gian chung, kèm âm lượng)
-    vào `track.segments`. Trả về (mảng âm thanh đã giải mã để trộn file nghe lại, tên mô hình)."""
+    vào `track.segments`. Trả về tên mô hình STT đã dùng.
+
+    Nếu file bị cụt đuôi (đóng tab đột ngột) hoặc container `.m4a` (Safari/iOS) lỗi phần cuối khiến
+    STT lỗi trực tiếp → tự cứu phần âm thanh hợp lệ sang `.wav` tạm rồi nhận dạng lại.
+    """
     path = track_abspath(track)
     size_before = track.size  # trong lúc nhận dạng có thể vẫn còn khúc về thêm (người rớt mạng)
     if path is None or not path.exists() or size_before == 0:
         track.segments, track.transcribed_size = [], size_before
-        return None, None
-    result = stt.transcribe(str(path), language="vi", on_progress=on_progress, initial_prompt=prompt)
-    audio = audio_mix.load_audio(path)
+        return None
+    try:
+        result = stt.transcribe(str(path), language="vi", on_progress=on_progress, initial_prompt=prompt)
+    except Exception:
+        recovered = path.with_suffix(".recovered.wav")
+        try:
+            if not audio_mix.transcode_safe_wav(path, recovered):
+                raise
+            log.info("Track %s (%s): đã cứu âm thanh sang WAV tạm để nhận dạng lại", track.id, track.speaker_name)
+            result = stt.transcribe(str(recovered), language="vi", on_progress=on_progress, initial_prompt=prompt)
+        finally:
+            recovered.unlink(missing_ok=True)
+    rms_values = audio_mix.segments_rms(path, [(s.start, s.end) for s in result.segments])
     raw = [
-        {"start": s.start, "end": s.end, "text": s.text, "rms": audio_mix.segment_rms(audio, s.start, s.end)}
-        for s in result.segments
+        {"start": s.start, "end": s.end, "text": s.text, "rms": rms}
+        for s, rms in zip(result.segments, rms_values, strict=True)
     ]
     track.segments = speaker_merge.place_segments(
         raw, track_offset(track, room), track.user_id, track.speaker_name, track.id
     )
     track.transcribed_size = size_before
     track.duration_sec = result.duration_sec
-    return audio, result.model
+    return result.model
 
 
-def write_mix(m: Meeting, mixer: audio_mix.Mixer) -> None:
-    """Trộn ghi âm của mọi người thành MỘT file để nghe lại cả buổi họp ở trang cuộc họp."""
+def write_mix(m: Meeting, tracks: list[MeetingTrack], room: MeetingRoom) -> float:
+    """Trộn ghi âm của mọi người theo luồng (RAM O(1)) thành MỘT file để nghe lại ở trang cuộc họp."""
+    sources = [
+        (p, track_offset(t, room))
+        for t in tracks
+        if t.size > 0 and (p := track_abspath(t)) is not None and p.exists()
+    ]
+    if not sources:
+        return 0.0
     folder = upload_root() / "meetings"
     folder.mkdir(parents=True, exist_ok=True)
     dest = folder / f"{m.id}.webm"
-    if mixer.write(dest):
+    ok, duration = audio_mix.mix_files(sources, dest)
+    if ok:
         m.audio_path = str(dest.relative_to(upload_root()))
         m.audio_filename = f"online-meeting-{m.id}.webm"
         m.audio_size = dest.stat().st_size
         m.audio_mime = "audio/webm"
+        return duration
+    return 0.0
 
 
 def save_transcript(db, m: Meeting, segments: list[dict], model: str | None, duration: float, took: float) -> Transcript:
@@ -130,14 +154,12 @@ def process_online_meeting_job(meeting_id: int) -> dict:
             return _fail(db, m, f"Lỗi xử lý ghi âm: {type(e).__name__}: {str(e)[:300]}")
 
         prompt = build_initial_prompt(db, m.workspace_id)
-        mixer = audio_mix.Mixer()
         errors: list[str] = []
         model: str | None = None
         for i, t in enumerate(tracks):
             try:
-                audio, used = transcribe_track(stt, t, room, prompt, progress_for(i))
+                used = transcribe_track(stt, t, room, prompt, progress_for(i))
                 model = used or model
-                mixer.add(audio, track_offset(t, room))
             except Exception as e:  # noqa: BLE001 — một file hỏng không được làm hỏng cả cuộc họp
                 log.exception("Cuộc họp %s: lỗi nhận dạng ghi âm của %s", meeting_id, t.speaker_name)
                 errors.append(f"{t.speaker_name}: {type(e).__name__}: {str(e)[:200]}")
@@ -156,9 +178,9 @@ def process_online_meeting_job(meeting_id: int) -> dict:
                 db, m, "Không nhận ra lời nói trong ghi âm của buổi họp (không ai nói, hoặc mic của mọi người đều tắt)."
             )
 
-        tr = save_transcript(db, m, merged, model, mixer.duration_sec, time.perf_counter() - t0)
+        mixed_duration = write_mix(m, tracks, room)
+        tr = save_transcript(db, m, merged, model, mixed_duration, time.perf_counter() - t0)
         tr.edited = False
-        write_mix(m, mixer)
         for t in tracks:
             t.merged = True
         m.status, m.progress = MeetingStatus.TRANSCRIBED, 100
@@ -192,7 +214,7 @@ def process_late_track_job(track_id: int, force: bool = False) -> dict:
         model: str | None = None
         if track.has_new_audio or not track.segments:
             try:
-                _, model = transcribe_track(get_stt_provider(), track, room, build_initial_prompt(db, m.workspace_id))
+                model = transcribe_track(get_stt_provider(), track, room, build_initial_prompt(db, m.workspace_id))
             except Exception as e:  # noqa: BLE001
                 log.exception("Lỗi nhận dạng ghi âm đến muộn (track %s)", track_id)
                 db.rollback()
@@ -212,19 +234,14 @@ def process_late_track_job(track_id: int, force: bool = False) -> dict:
             db.commit()
             return {"empty": True}
         was_edited = bool(tr and tr.edited)
-        duration = (tr.duration_sec or 0.0) if tr else 0.0
+        # Trộn lại file nghe lại cho có cả tiếng của người đến muộn (theo luồng, RAM O(1))
+        mixed_duration = write_mix(m, room.tracks, room)
+        duration = max((tr.duration_sec or 0.0) if tr else 0.0, mixed_duration)
         tr = save_transcript(db, m, merged, model, duration, time.perf_counter() - t0)
         tr.edited = was_edited
         track.merged = True
         if m.status == MeetingStatus.FAILED:  # trước đó "không nhận ra lời nói" → giờ đã có
             m.status, m.error, m.progress = MeetingStatus.TRANSCRIBED, None, 100
-
-        # Trộn lại file nghe lại cho có cả tiếng của người đến muộn
-        mixer = audio_mix.Mixer()
-        for t in room.tracks:
-            if t.size > 0 and (p := track_abspath(t)) is not None:
-                mixer.add(audio_mix.load_audio(p), track_offset(t, room))
-        write_mix(m, mixer)
         db.commit()
         notify_meeting(m)
         log.info("Cuộc họp %s: bổ sung ghi âm của %s (%d câu)", m.id, track.speaker_name, len(track.segments))

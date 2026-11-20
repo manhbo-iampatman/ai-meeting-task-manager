@@ -100,6 +100,8 @@ def fake_ai(monkeypatch):
     monkeypatch.setattr(online_jobs, "get_stt_provider", lambda: FakeSTT())
     # Không giải mã âm thanh thật: không có số đo âm lượng, không ghi file trộn
     monkeypatch.setattr(online_jobs.audio_mix, "load_audio", lambda path: None)
+    monkeypatch.setattr(online_jobs.audio_mix, "segments_rms", lambda path, intervals: [None] * len(intervals))
+    monkeypatch.setattr(online_jobs.audio_mix, "mix_files", lambda sources, dest: (False, 0.0))
 
 
 def _setup(client):
@@ -592,6 +594,40 @@ def test_echo_is_dropped_and_the_real_speaker_is_kept():
     nam[0]["rms"], lan[0]["rms"] = 0.02, 0.25
     merged, _ = speaker_merge.merge_tracks([nam, lan])
     assert merged[0]["speaker_id"] == 2
+
+
+def test_echo_filter_handles_mismatched_mic_gain_and_silent_listener():
+    """Mic của Lan nhạy hơn mic Nam gấp 10 lần → tiếng vọng ở track Lan có RMS thô TO hơn
+    giọng thật của Nam, nhưng so theo RMS TƯƠNG ĐỐI (so với giọng bình thường của chính từng
+    mic) thì vẫn nhận đúng Nam là người nói thật."""
+    nam = [
+        _seg(0.0, 3.0, "Chào mọi người, mình bắt đầu buổi họp tuần nhé.", 1, 1, rms=0.020),
+        _seg(5.0, 9.0, "Lan viết chương hai, nộp trước thứ Sáu tuần này nhé.", 1, 1, rms=0.018),
+    ]
+    lan = [
+        _seg(5.4, 9.2, "viết chương hai nộp trước thứ sáu tuần này nhé", 2, 2, rms=0.030),  # vọng: thô 0.030 > 0.018, nhưng chỉ 13% giọng Lan!
+        _seg(10.0, 13.0, "Dạ vâng, thứ Sáu em gửi bản nháp cho anh ạ.", 2, 2, rms=0.220),
+    ]
+    merged, echoes = speaker_merge.merge_tracks([nam, lan])
+    assert [e["speaker_id"] for e in echoes] == [2]
+    assert [(s["speaker_id"], s["start"]) for s in merged] == [(1, 0.0), (1, 5.0), (2, 10.0)]
+
+    # Trường hợp Lan KHÔNG nói câu nào suốt buổi (chỉ nghe loa ngoài → 100% track Lan là vọng):
+    # track Lan không có baseline riêng nên KHÔNG tự đẩy tiếng vọng lên 100%, rơi về RMS thô → vẫn bỏ Lan.
+    nam_only = [
+        _seg(0.0, 3.0, "Chào mọi người, hôm nay nhóm chốt tiến độ nhé.", 1, 1, rms=0.10),
+        _seg(5.0, 8.0, "Tuần này cả nhóm hoàn thành phần thực nghiệm nha.", 1, 1, rms=0.06),
+    ]
+    lan_silent = [_seg(5.4, 8.2, "tuần này cả nhóm hoàn thành phần thực nghiệm", 2, 2, rms=0.012)]
+    merged, echoes = speaker_merge.merge_tracks([nam_only, lan_silent])
+    assert [e["speaker_id"] for e in echoes] == [2]
+    assert [s["speaker_id"] for s in merged] == [1, 1]
+
+    # Âm lượng tương đương nhau → tiếng vọng (đến trễ hơn do mạng + loa) bị bỏ
+    same_a = [_seg(0.0, 3.0, "Mình chốt dùng PostgreSQL cho hệ thống nhé.", 1, 1, rms=0.10)]
+    same_b = [_seg(0.4, 3.3, "Mình chốt dùng PostgreSQL cho hệ thống nhé.", 2, 2, rms=0.10)]
+    merged, echoes = speaker_merge.merge_tracks([same_a, same_b])
+    assert [s["speaker_id"] for s in merged] == [1] and [e["speaker_id"] for e in echoes] == [2]
 
 
 def test_echo_filter_keeps_real_overlaps():

@@ -1,4 +1,11 @@
-# Thư viện cho thí nghiệm (cài vào .venv của backend)
+# Thư viện cho thực nghiệm Giai đoạn 7 (cài vào .venv của backend)
+# Cài nhanh:  backend\.venv\Scripts\pip install -r experiments\requirements.txt
 edge-tts>=7.0      # sinh giọng đọc tiếng Việt cho cuộc họp giả lập
-jiwer>=3.0         # tính WER
+jiwer>=3.0         # tính WER / CER
 httpx>=0.28        # eval_wer.py --meeting: lấy bản ghi từ API
+matplotlib>=3.9    # plot_results.py: vẽ biểu đồ 300 DPI cho Chương 4 báo cáo
+
+# Tùy chọn — chỉ cần nếu muốn chạy PhoWhisper gốc từ HuggingFace (tiền tố `hf:` trong --models của exp1_stt.py)
+# thay vì bản CTranslate2 (tiền tố `fw:`). Trên Windows `pip install torch` thường cài bản CPU-only → cài bản CUDA:
+#   backend\.venv\Scripts\pip install torch --index-url https://download.pytorch.org/whl/cu124
+#   backend\.venv\Scripts\pip install "transformers>=4.46"

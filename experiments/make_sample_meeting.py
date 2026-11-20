@@ -13,7 +13,10 @@ Chạy:  backend\\.venv\\Scripts\\python experiments\\make_sample_meeting.py
 Kết quả trong experiments/data/sample_meeting_01/:
   meeting.wav          — file ghi âm (16kHz mono)
   reference.txt        — bản ghi chuẩn (để tính WER)
-  expected_tasks.json  — danh sách đầu việc chuẩn (để chấm bước trích xuất ở GĐ4)
+  expected_tasks.json  — danh sách đầu việc chuẩn, đánh dấu `"synthetic": true`
+
+Đây là dữ liệu GIẢ LẬP (giọng TTS, 85 giây) → các script thực nghiệm mặc định LOẠI nó khỏi số liệu
+Chương 4 (chỉ dùng để chạy thử, thêm `--include-synthetic` nếu muốn tính).
 """
 
 import asyncio
@@ -58,11 +61,14 @@ SCRIPT: list[tuple[str, str]] = [
     ("Nam", "Ok, vậy chốt lại: Lan viết chương hai và gửi email cho thầy, Minh làm trình phát âm thanh, anh làm bộ dữ liệu. Cảm ơn mọi người."),
 ]
 
+# Danh sách nhóm (khai báo rõ để không phải suy ra từ đáp án)
+MEMBERS = [{"id": 1, "full_name": "Nam", "nicknames": []}, {"id": 2, "full_name": "Lan", "nicknames": []}, {"id": 3, "full_name": "Minh", "nicknames": []}]
+
 # Đáp án chuẩn cho bước trích xuất đầu việc (Giai đoạn 4)
 EXPECTED_TASKS = [
     {"assignee": "Lan", "task": "Viết chương 2 – cơ sở lý thuyết về nhận dạng giọng nói", "due_date": "2026-11-20"},
     {"assignee": "Minh", "task": "Hoàn thành trình phát âm thanh và sửa lỗi hiển thị trên điện thoại", "due_date": "2026-11-25"},
-    {"assignee": "Nam", "task": "Chuẩn bị bộ dữ liệu thử nghiệm gồm 10 đoạn ghi âm", "due_date": "2026-11-25"},
+    {"assignee": "Nam", "task": "Chuẩn bị bộ dữ liệu thử nghiệm gồm 10 đoạn ghi âm", "due_date": "2026-11-25", "self_claimed": True},
     {"assignee": "Lan", "task": "Gửi email hẹn lịch demo với thầy hướng dẫn", "due_date": "2026-11-17"},
 ]
 
@@ -108,7 +114,12 @@ async def main() -> None:
     (OUT / "reference.txt").write_text("\n".join(t for _, t in SCRIPT) + "\n", encoding="utf-8")
     (OUT / "reference_speakers.txt").write_text("\n".join(f"{s}: {t}" for s, t in SCRIPT) + "\n", encoding="utf-8")
     (OUT / "expected_tasks.json").write_text(
-        json.dumps({"meeting_date": MEETING_DATE, "tasks": EXPECTED_TASKS}, ensure_ascii=False, indent=2), encoding="utf-8"
+        json.dumps(
+            {"meeting_date": MEETING_DATE, "source": "tts", "synthetic": True, "members": MEMBERS, "tasks": EXPECTED_TASKS},
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8"
     )
     print(f"Xong: {OUT / 'meeting.wav'}  ({len(audio) / SR:.1f} giây)")
 

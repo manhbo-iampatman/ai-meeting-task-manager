@@ -272,7 +272,7 @@ function LiveRoom({ initial }: { initial: Room }) {
       {recording === 'on' && (
         <p className="bg-rose-950/60 px-4 py-1.5 text-center text-xs text-rose-100">
           Buổi họp đang được ghi âm để làm biên bản. Lời nói của bạn được ghi lại khi mic bật; tắt mic thì không ghi.
-          {recorder === 'error' && <b> Trình duyệt này không ghi được mic của bạn — hãy dùng Chrome hoặc Edge bản mới.</b>}
+          {recorder === 'error' && <b> Không ghi được mic của bạn — hãy kiểm tra kết nối mạng hoặc dùng Chrome / Edge bản mới.</b>}
         </p>
       )}
       {hostNotice && <p className="bg-brand-900/70 px-4 py-1.5 text-center text-xs text-brand-100">{hostNotice}</p>}

@@ -143,6 +143,7 @@ nguồn im lặng ──►        ▲
 - **Tắt mic** = LiveKit "bịt" đường tiếng (`track.enabled = false`), nút trộn vẫn chạy và ghi ra **khoảng lặng**. File dài đúng bằng thời gian thật → mốc thời gian của mọi người luôn khớp. (Nếu dừng hẳn máy ghi khi tắt mic thì file bị "co lại", mọi câu sau đó lệch giờ.)
 - **Đổi mic / bật mic lần đầu**: LiveKit tạo đường tiếng mới → chỉ việc nối nó vào nút trộn, không phải dừng máy ghi.
 - "Nguồn im lặng" luôn chạy để lúc chưa có mic máy ghi vẫn nhận dữ liệu liên tục.
+- **Mạng chập chờn lúc bắt đầu ghi**: lệnh mở track (`createRoomTrack`) tự thử lại tối đa 5 lần (1s → 10s), tính lại `elapsed_ms` trước mỗi lần thử để không lệch giờ; các khúc ghi được trong lúc chờ được giữ tạm rồi đẩy lên theo đúng thứ tự. Khi dừng ghi, chỉ đóng `TrackUploader` sau sự kiện `onstop` của `MediaRecorder` để không làm rơi khúc cuối. Nếu lỗi quyền hoặc mất mạng quá lâu thì hiện cảnh báo rõ trên thanh thông báo.
 
 ### Xếp lời của mọi người lên một trục thời gian
 Đồng hồ máy mỗi người lệch nhau vài giây → không dùng được. Cách làm: khi máy ghi vừa chạy, trình duyệt báo máy chủ; **máy chủ đóng dấu giờ theo đồng hồ của nó** (`meeting_tracks.started_at`). Độ lệch của một track = `started_at − recording_started_at của phòng`. Ai vào muộn 40 giây thì mọi câu của họ được cộng 40 giây. Sai số = độ trễ một request trong LAN (vài mili giây).
@@ -158,7 +159,7 @@ Vì sao không đợi họp xong mới gửi cả file? Vì gửi dần thì h�
 | Hai request cùng ghi một file | `SELECT … FOR UPDATE` khóa dòng track trong lúc nối |
 | Đóng tab khi chưa gửi hết | Phần còn lại nằm trong IndexedDB; lần sau mở MeetFlow (hoặc khi có mạng lại) `resumePendingTracks()` gửi nốt |
 
-Các khúc `.webm` nối đuôi nhau theo đúng thứ tự chính là một file `.webm` hợp lệ (khúc đầu chứa phần đầu file) → máy chủ chỉ cần mở file ở chế độ nối thêm.
+Các khúc `.webm` nối đuôi nhau theo đúng thứ tự chính là một file `.webm` hợp lệ (khúc đầu chứa phần đầu file) → máy chủ chỉ cần mở file ở chế độ nối thêm. Nếu gói cuối bị cụt (đóng tab đột ngột) khiến Whisper báo lỗi trực tiếp, worker tự giải mã an toàn từng gói sang `.wav` tạm (`audio_mix.transcode_safe_wav`) để cứu phần âm thanh hợp lệ rồi nhận dạng lại. **Đã thử:** file `.webm` bị cắt còn 50% / 80% / 97% đều cứu được trọn phần còn lại. **Chưa cứu được:** file `.m4a` (Safari/iOS) bị cắt cụt — thử với file `.m4a` thường thì hỏng ngay từ bước mở file (phần mục lục của MP4 nằm cuối file), nên phần này ghi vào Hạn chế.
 
 ### Kết thúc phòng: chờ ai?
 `try_finalize`: đủ mọi track báo "đã gửi xong" → xử lý **ngay**. Còn người chưa xong → chờ tối đa `ROOM_UPLOAD_WAIT_SEC` (120 giây) rồi nhận dạng với phần đã có; trang cuộc họp ghi **"Thiếu ghi âm của …"**.
@@ -174,11 +175,11 @@ Lý do: tự sửa một bản ghi người ta đã chỉnh tay / đã dùng đ�
 
 ## 6. Ghép bản ghi và lọc tiếng vọng — `ai/postprocess/speaker_merge.py`, `workers/online_jobs.py`
 
-Worker nhận dạng **lần lượt từng track** (GPU 4GB chỉ chạy một việc mỗi lúc), rồi:
+Worker nhận dạng **lần lượt từng track** (GPU 4GB chỉ chạy một việc mỗi lúc), đo RMS từng câu theo luồng (`audio_mix.segments_rms`), rồi:
 1. `place_segments`: gắn họ tên người nói + cộng độ lệch.
 2. Trộn mọi câu theo thời gian.
 3. `drop_echoes`: lọc tiếng vọng.
-4. Trộn âm thanh của mọi người thành **một file** `.webm` để nghe lại ở trang cuộc họp (`audio_mix.Mixer`).
+4. Trộn âm thanh của mọi người **theo luồng từng khối 1 giây** thành **một file** `.webm` để nghe lại ở trang cuộc họp (`audio_mix.mix_files`, RAM hằng số chỉ vài MB và có `soft_limit` chống rè tiếng khi nhiều người nói đè nhau).
 
 ### Tiếng vọng là gì và lọc thế nào?
 Lan nghe bằng loa ngoài → mic của Lan thu lại tiếng Nam → câu của Nam xuất hiện ở **cả hai** track, và bản ở track của Lan bị gán nhầm là "Lan nói". Trình duyệt có khử vọng nhưng không hết. Hai câu bị coi là một câu thu hai lần khi **cả ba** điều kiện đúng:
@@ -189,7 +190,11 @@ Lan nghe bằng loa ngoài → mic của Lan thu lại tiếng Nam → câu củ
 | Cùng thời điểm | bắt đầu lệch ≤ 2 giây, hoặc chồng nhau ≥ 50% | Tiếng vọng tới gần như đồng thời |
 | Chữ giống nhau | ≥ 80% (so không dấu; `partial_ratio` vì bản vọng hay cụt đầu / đuôi) | Whisper nghe bản vọng không rõ nên sai vài chữ |
 
-Giữ bản nào? **Bản to hơn** (đo RMS — âm lượng trung bình — của đúng đoạn đó trên từng track): tiếng thật đi thẳng vào mic, tiếng vọng đi loa → không khí → mic nên nhỏ hơn nhiều. Không có số đo thì giữ bản dài hơn.
+Giữ bản nào? *Mức giọng chuẩn* (`baseline`) của một track = trung vị RMS các câu người đó nói riêng (không nghi vọng). Xét theo thứ tự, để không bị lừa khi mic người này nhạy hơn mic người kia:
+1. **Cả hai track có mức giọng chuẩn → so RMS tương đối** (`rms / baseline`). Mic Lan nhạy hơn mic Nam gấp 10 lần thì bản vọng ở track Lan vẫn chỉ bằng ~15% giọng thật của Lan → lọc đúng bản vọng.
+2. **Chỉ MỘT track có mức giọng chuẩn → mức tương đối của track đó quyết định.** Hay gặp nhất: người nghe loa ngoài không nói câu nào suốt buổi (không có baseline). Câu của bên có baseline ở mức bình thường của chính nó (> 40%) → bên đó là tiếng thật, bên kia là vọng. **Không** rơi về RMS thô, vì đúng trường hợp này mic người nghe nhạy hơn sẽ làm RMS thô của tiếng vọng to hơn tiếng thật.
+3. **Không track nào có mức giọng chuẩn** → RMS thô chỉ được tin khi chênh **rất rõ (≥ 2 lần)**; chênh ít hơn thì tin **thứ tự đến** (tiếng vọng qua WebRTC + loa luôn đến trễ hơn), rồi mới tới RMS thô chênh vừa.
+4. **Độ dài câu** (khi không có số đo âm lượng): giữ bản đầy đủ hơn.
 
 Câu ngắn dưới 12 ký tự ("Dạ vâng ạ") **không lọc**: hai người cùng "dạ" một lúc là chuyện thường.
 
@@ -214,6 +219,8 @@ Phần quyết định cuối cùng vẫn là **code**, không phải LLM (giữ
 | Người làm (sau khi ghép tên) **chính là người nói** câu bằng chứng | Kiểu ghép `speaker` — "người nói tự nhận", điểm 100 |
 | Nhóm có 2 bạn trùng tên, một trong hai là người nói câu đó | Chọn đúng người nói (GĐ4 phải báo "trùng nhiều thành viên") |
 | LLM vẫn trả về đại từ | Giữ `self`, để trống cho người duyệt chọn. Không đoán: "em làm nhé" (giao) và "em làm ạ" (nhận) khác nhau ở ngữ cảnh, luật cứng không phân biệt được |
+| LLM chép gộp lời của **2 người** làm câu bằng chứng (*"Phần slide thì ai nhận? Để em làm ạ."*) | **Không dùng nhãn người nói** cho việc đó (`quote_speakers`): từng câu riêng đều khớp một phần 100% nên không biết chắc câu bằng chứng là của ai. Ghép cặp 2 câu liền nhau (khi Whisper cắt đôi một câu) cũng chỉ ghép khi **cùng người nói** |
+| Gộp việc trùng (`_dedupe`) | So người làm theo `assignee_id` trước (thay vì chuỗi chữ), nên câu tự nhận ("Nguyễn Văn Nam") và câu chốt cuối buổi ("Nam") được gộp thành 1 việc, giữ nhãn `speaker` |
 
 Tham số `use_speakers=False` của `extract_meeting` bỏ tên người nói khỏi các dòng → dùng cho **thí nghiệm có / không có nhãn người nói** ở GĐ7.
 
@@ -238,7 +245,7 @@ Tham số `use_speakers=False` của `extract_meeting` bỏ tên người nói k
 
 ## 9. Kiểm thử
 
-**167 test tự động** (thêm 24 test trong `tests/test_rooms.py`). LiveKit, Whisper, LLM đều thay bằng bản giả → không cần Docker / GPU:
+**192 test tự động** (25 test trong `tests/test_rooms.py`, 9 test trong `tests/test_audio_mix.py`, test bổ sung ở `tests/test_llm.py`, 12 test cho bộ khung thực nghiệm trong `tests/test_experiments.py`). LiveKit, Whisper, LLM đều thay bằng bản giả → không cần LiveKit / GPU:
 
 | Nhóm | Kiểm tra |
 |---|---|
@@ -249,8 +256,9 @@ Tham số `use_speakers=False` của `extract_meeting` bỏ tên người nói k
 | Kết thúc | Chờ người chưa gửi xong; người cuối gửi xong thì xử lý ngay; hết 2 phút thì thôi chờ; phòng trống tự đóng |
 | Bản ghi | Có tên người nói, người vào muộn được dời mốc, sửa chữ không mất tên người nói, không ai nói thì báo lỗi rõ |
 | Đến muộn | Tự bổ sung khi bản ghi chưa đụng tới; đã sửa tay thì chờ người duyệt bấm; chỗ sửa tay của người khác vẫn còn |
-| Tiếng vọng | Bỏ bản vọng, giữ người nói thật; không bỏ nhầm câu ngắn, câu khác nội dung, câu cách xa nhau |
-| Giao việc | Người nói tự nhận → đúng tài khoản dù trùng tên; đại từ giao cho người khác → không gán bừa; tắt nhãn thì như GĐ4 |
+| Tiếng vọng | Bỏ bản vọng, giữ người nói thật (kể cả khi mic người nghe nhạy hơn mic người nói gấp 10 lần, hoặc người nghe không nói câu nào suốt buổi); không bỏ nhầm câu ngắn, câu khác nội dung, câu cách xa nhau |
+| Âm thanh | Trộn và đo RMS theo luồng từ file `.webm` thật; `soft_limit` chống cắt phẳng khi 6 người nói đè nhau; tự cứu file `.webm` bị cụt đuôi sang `.wav` tạm để nhận dạng |
+| Giao việc | Người nói tự nhận → đúng tài khoản dù trùng tên; đại từ giao cho người khác → không gán bừa; không ghép câu trích dẫn xuyên qua 2 người nói; gộp việc trùng theo `assignee_id`; tắt nhãn thì như GĐ4 |
 
 **Thử đầu-cuối bằng âm thanh thật (18/11/2026)** — API thật + LiveKit thật + Whisper trên GPU + Gemini, trên CSDL test. Cuộc họp mẫu 85 giây được tách thành 3 file riêng (Nam, Lan, Minh); Minh "vào muộn" 10 giây; track của Lan bị trộn thêm tiếng Nam nhỏ 12% và trễ 0,3 giây (giả lập nghe loa ngoài):
 
@@ -282,10 +290,36 @@ Khung trình duyệt của công cụ lập trình **chặn mic / cam** và ch�
 ## 11. Hạn chế (nói thật khi bảo vệ)
 
 - Chỉ chạy trong LAN. Người ở xa cần máy chủ có IP công khai (hoặc LiveKit Cloud + Cloudflare Tunnel) — hướng phát triển.
-- Trộn file nghe lại giữ cả buổi họp trong RAM (≈ 230 MB cho 1 giờ) → hợp với họp nhóm 1–2 giờ, chưa hợp họp cả ngày.
 - Lọc tiếng vọng dựa trên chữ Whisper nghe được: bản vọng bị nghe sai quá nhiều (dưới 80%) sẽ lọt.
 - Người nghe loa ngoài mà nói *chen* đúng lúc người khác nói: hai giọng lẫn trong một track, Whisper có thể ghép thành một câu sai.
 - Một người dùng hai thiết bị cùng tài khoản: LiveKit coi là một người (thiết bị vào sau đẩy thiết bị trước ra).
+- Lọc tiếng vọng khi **không ai có mức giọng chuẩn** (mọi câu đều bị vọng) **và** mic lệch độ nhạy ≥ 2 lần **và** mốc thời gian Whisper của hai bản gần như trùng nhau: không còn căn cứ nào chắc chắn, có thể giữ nhầm bản.
+- File nghe lại trộn theo luồng nên không tốn RAM theo độ dài buổi họp, nhưng **bước nhận dạng vẫn nạp nguyên ghi âm của từng người** vào RAM (faster-whisper giải mã cả file): khoảng 230 MB cho track dài 1 giờ, xử lý lần lượt từng người.
+- File `.m4a` (Safari/iOS) bị cụt đuôi chưa cứu được (xem mục 5); `.webm` (Chrome / Edge / Firefox) thì cứu được.
+
+## 12. Cải thiện & sửa lỗi logic trước GĐ7 (19/11/2026)
+
+Trước khi chạy thực nghiệm với người thật ở GĐ7, rà soát lại code GĐ4–GĐ6 phát hiện **5 điểm yếu logic / kỹ thuật** và đã sửa (xem thêm phần *Rà soát lại* ngay dưới bảng — 3 trong 5 bản sửa được chỉnh tiếp):
+
+| # | Lỗi / hạn chế ở bản cũ | Vì sao dễ hỏng khi chạy thật | Đã sửa như thế nào | File sửa |
+|---|---|---|---|---|
+| 1 | `_dedupe` so trùng người làm theo chuỗi chữ `raw_assignee` | Trong Online Meeting, lúc tự nhận LLM ghi `"Nguyễn Văn Nam"`, cuối buổi người khác chốt ghi `"Nam"` → cùng một người nhưng khác chữ nên **không gộp được, tạo 2 đầu việc trùng** | Thêm `_assignee_key`: ưu tiên so theo `assignee_id` nếu đã ghép tài khoản; chưa có tài khoản thì bỏ xưng hô (`strip_honorific`) rồi mới so. Khi gộp vẫn giữ nhãn `speaker` và không ghi đè câu gốc hợp lệ | `backend/app/ai/extraction.py` |
+| 2 | `find_evidence` ghép 2 câu liền nhau mà không kiểm tra người nói | Nếu câu `i` của Nam (*"Ai làm slide?"*) và câu `i+1` của Lan (*"Để em làm ạ"*) bị ghép cặp, hàm trả vị trí câu `i` → **gán nhầm `said_by` sang Nam** | Chỉ cho phép ghép cặp câu `i` và `i+1` khi **cùng `speaker_id` và `speaker`** (bản ghi thường không có nhãn vẫn ghép như cũ) | `backend/app/ai/extraction.py` |
+| 3 | `drop_echoes` so trực tiếp RMS thô giữa 2 mic khác nhau | Mic của người bật loa ngoài có thể nhạy hơn mic người nói thật → tiếng vọng có RMS thô **to hơn** giọng gốc → **lọc nhầm câu thật, giữ câu vọng** | Tính *mức giọng chuẩn* (`baseline`, trung vị RMS) của từng track chỉ trên các câu nói riêng không nghi vọng, rồi so **RMS tương đối** (`rms / baseline`); rơi về RMS thô khi thiếu baseline (VD. người chỉ nghe không nói), sau đó xét độ trễ thời gian (vọng đến sau) và độ dài câu | `backend/app/ai/postprocess/speaker_merge.py` |
+| 4 | Khởi tạo track không retry, `elapsed_ms` luôn bằng 0, dễ rơi khúc cuối & chưa cứu file cụt đuôi / `.m4a` | Mạng chập chờn đúng lúc bấm ghi làm máy ghi tắt im lặng (`idle`) → mất cả track; `rec.stop()` chạy đúng lúc `createRoomTrack` vừa trả về có thể đóng uploader trước khi khúc cuối kịp vào; đóng tab đột ngột / Safari `.m4a` dễ làm file lỗi cuối | `useRoomRecorder` retry tối đa 5 lần (1s → 10s), tính lại `elapsed_ms` ngay trước mỗi lần gọi, lỗi cứng chuyển `'error'` để hiện cảnh báo rõ, chỉ đóng uploader sau `rec.onstop`. Worker thêm `transcode_safe_wav` tự cứu file cụt đuôi / `.m4a` sang `.wav` tạm khi STT lỗi trực tiếp | `frontend/src/hooks/useRoomRecorder.ts`, `frontend/src/pages/RoomPage.tsx`, `backend/app/workers/online_jobs.py` |
+| 5 | Trộn file nghe lại giữ nguyên mảng `float32` cả buổi trong RAM (~230 MB/giờ) và `np.clip` cứng | Họp dài 3–4 tiếng ngốn nhiều trăm MB RAM; 2–6 người nói đè nhau cộng biên độ vượt `1.0` bị cắt phẳng gây rè tiếng | Chuyển `segments_rms` và `mix_files` sang **đọc / trộn theo luồng từng khối 1 giây** qua PyAV (RAM hằng số chỉ vài MB bất kể thời lượng) và nén biên độ mượt bằng `soft_limit` (giữ nguyên dưới `0,75`, nén hữu tỉ về dưới `0,98`) | `backend/app/ai/audio_mix.py`, `backend/app/workers/online_jobs.py` |
+
+
+### Rà soát lại các bản sửa (19/11/2026)
+
+Kiểm lại từng bản sửa bằng cách chạy thử (không chỉ đọc code) thì thấy 3 chỗ chưa đạt đúng điều tài liệu mô tả, đã sửa tiếp:
+
+| Bản sửa | Phát hiện khi chạy thử | Đã sửa tiếp |
+|---|---|---|
+| 2 — ghép câu trích dẫn | Chưa chặn được đúng tình huống nhắm tới. `find_evidence` so khớp **một phần**, nên khi LLM chép gộp *"Phần slide thì ai nhận? Để em làm ạ."*, câu hỏi của Nam riêng đã khớp 100% → vẫn trả về câu của Nam (bước ghép cặp không được dùng tới) → việc bị gắn nhãn "người nói tự nhận" cho Nam | Thêm `quote_speakers`: câu bằng chứng chứa trọn câu của **từ 2 người nói trở lên** → không dùng nhãn người nói, chỉ ghép tên như GĐ4 (không chắc thì không đoán). Test `test_cross_speaker_quote_is_not_labelled_self_claim` |
+| 3 — lọc tiếng vọng | Đúng khi mic nhạy gấp 10 lần **hoặc** người nghe không nói; nhưng **cả hai cùng lúc** (mô phỏng 4 câu) thì bỏ nhầm **4/4 câu thật** của Nam, giữ tiếng vọng như thể Lan nói. Nguyên nhân: chỉ một bên có mức giọng chuẩn thì code không kết luận gì mà rơi về RMS thô — đúng cái dễ bị mic nhạy đánh lừa | Tầng 2 mới: chỉ một bên có mức giọng chuẩn thì mức tương đối của bên đó quyết định; không ai có mức giọng chuẩn thì RMS thô phải chênh ≥ 2 lần mới thắng thứ tự đến. Sau sửa: 0/4 câu bị bỏ nhầm ở mọi kịch bản đã thử. Test `test_echo_filter_silent_listener_with_sensitive_mic_keeps_real_speaker`, `test_echo_filter_without_any_baseline_prefers_arrival_order` |
+| 4 — cứu file cụt đuôi | (a) Code bắt lỗi bằng `av.AVError`, nhưng PyAV 15 (bản đang dùng) **không còn lớp này** (đổi tên thành `av.FFmpegError`) → gặp gói lỗi giữa chừng thì văng `AttributeError` thay vì "dừng êm, giữ phần đã đọc". Lỗi ẩn vì `.webm` cụt không làm PyAV báo lỗi. (b) Tài liệu ghi cứu được `.m4a` nhưng thử thì không mở được | (a) Dùng `_av_errors()` (nhận cả tên cũ lẫn tên mới). Test `test_decode_error_mid_stream_keeps_audio_read_so_far` giả lập gói hỏng giữa file. (b) Sửa tài liệu, đưa `.m4a` cụt vào Hạn chế |
+| 5 — trộn theo luồng | Đúng, nhưng tài liệu xóa luôn dòng hạn chế về RAM trong khi bước nhận dạng vẫn nạp cả track | Ghi lại đúng phạm vi vào Hạn chế |
 
 ---
 
@@ -311,7 +345,7 @@ Khung trình duyệt của công cụ lập trình **chặn mic / cam** và ch�
 9. Gửi khúc bị lặp / nhảy cóc / mất mạng được xử lý thế nào? "Idempotent" nghĩa là gì?
 10. Phòng kết thúc mà còn người chưa gửi xong ghi âm thì hệ thống làm gì? Phần về muộn đi đâu?
 11. Vì sao ghi âm đến muộn không tự chèn vào bản ghi đã sửa tay?
-12. Ba điều kiện để hai câu bị coi là tiếng vọng? Giữ bản nào, dựa vào đâu?
+12. Ba điều kiện để hai câu bị coi là tiếng vọng? Giữ bản nào, dựa vào đâu? Vì sao không so thẳng âm lượng của hai mic? Nếu người nghe loa ngoài không nói câu nào thì sao?
 13. Vì sao không dùng diarization (pyannote)?
 14. "Để em làm ạ" và "Em làm phần này nhé" được xử lý khác nhau thế nào? Ai quyết định: LLM hay code?
 15. Những gì trong giai đoạn này CHƯA được thử bằng thực tế?
