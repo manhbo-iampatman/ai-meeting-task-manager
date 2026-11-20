@@ -125,6 +125,41 @@ def test_upload_audio_is_queued_and_playable(client, fake_queue):
     assert [x["title"] for x in lst] == ["Họp tuần 1"]
 
 
+def test_audio_served_as_audio_even_if_upload_claims_html(client):
+    """Lỗ hổng XSS: tải lên "x.mp3" nhưng khai loại file là trang web có mã độc. Khi phát lại,
+    server phải trả loại âm thanh (theo đuôi file) + "nosniff", không bao giờ trả text/html."""
+    from app.core.database import SessionLocal
+    from app.models import Meeting
+
+    owner, ws = _setup(client)
+    evil = b"<html><script>alert(localStorage.getItem('auth'))</script></html>"
+    r = client.post(
+        f"/api/workspaces/{ws['id']}/meetings",
+        data={"title": "Họp", "meeting_date": "2026-11-16"},
+        files={"file": ("x.mp3", evil, "text/html")},
+        headers=auth(owner),
+    )
+    assert r.status_code == 201, r.text
+    mid = r.json()["id"]
+    token = owner["Authorization"].split()[1]
+
+    def fetch():
+        res = client.get(f"/api/meetings/{mid}/audio?token={token}")
+        assert res.status_code == 200
+        return res
+
+    res = fetch()
+    assert res.headers["content-type"] == "audio/mpeg"
+    assert res.headers["x-content-type-options"] == "nosniff"
+    with SessionLocal() as db:
+        m = db.get(Meeting, mid)
+        assert m.audio_mime == "audio/mpeg"  # không lưu loại file do trình duyệt khai báo
+        # Cuộc họp cũ (tải lên trước bản sửa) có thể đã lưu loại file giả trong CSDL
+        m.audio_mime = "text/html"
+        db.commit()
+    assert fetch().headers["content-type"] == "audio/mpeg"
+
+
 def test_worker_job_success_with_member_names_prompt(client, monkeypatch):
     from app.workers import jobs
 

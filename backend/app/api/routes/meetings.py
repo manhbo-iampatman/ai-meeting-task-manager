@@ -349,7 +349,10 @@ def get_audio(meeting_id: int, token: str):
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Không có file ghi âm")
         return FileResponse(
             path,
-            media_type=m.audio_mime or "application/octet-stream",
+            media_type=svc.audio_media_type(m),
             filename=m.audio_filename,
             content_disposition_type="inline",
+            # "nosniff": cấm trình duyệt tự đoán loại file từ nội dung → file ghi âm luôn được
+            # coi là âm thanh, không bao giờ bị chạy như trang web
+            headers={"X-Content-Type-Options": "nosniff"},
         )

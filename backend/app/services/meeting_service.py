@@ -15,7 +15,25 @@ log = logging.getLogger(__name__)
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 MAX_UPLOAD_BYTES = 300 * 1024 * 1024  # 300MB ≈ 5 giờ ghi âm mp3
-AUDIO_EXTS = {".mp3", ".m4a", ".wav", ".webm", ".ogg", ".oga", ".opus", ".aac", ".flac", ".mp4", ".mpeg", ".amr", ".wma"}
+# Đuôi file → loại file (MIME) khi phát lại. Server TỰ quyết định loại file theo đuôi, KHÔNG tin
+# loại file do trình duyệt khai báo lúc tải lên: kẻ xấu có thể gửi file "x.mp3" nhưng khai là trang
+# web (text/html) chứa mã độc → đồng đội mở link nghe lại là mã chạy trên trang MeetFlow (lỗi XSS).
+AUDIO_MIME = {
+    ".mp3": "audio/mpeg",
+    ".mpeg": "audio/mpeg",
+    ".m4a": "audio/mp4",
+    ".mp4": "audio/mp4",
+    ".wav": "audio/wav",
+    ".webm": "audio/webm",
+    ".ogg": "audio/ogg",
+    ".oga": "audio/ogg",
+    ".opus": "audio/ogg",
+    ".aac": "audio/aac",
+    ".flac": "audio/flac",
+    ".amr": "audio/amr",
+    ".wma": "audio/x-ms-wma",
+}
+AUDIO_EXTS = set(AUDIO_MIME)
 TEXT_EXTS = {".txt"}
 CHUNK = 1024 * 1024
 
@@ -53,13 +71,24 @@ def save_audio(file: UploadFile, meeting: Meeting) -> None:
     meeting.audio_path = str(dest.relative_to(upload_root()))
     meeting.audio_filename = (file.filename or dest.name)[:255]
     meeting.audio_size = size
-    meeting.audio_mime = file.content_type
+    meeting.audio_mime = AUDIO_MIME[ext]  # không lưu file.content_type do trình duyệt khai báo
 
 
 def audio_abspath(meeting: Meeting) -> Path | None:
     if not meeting.audio_path:
         return None
     return upload_root() / meeting.audio_path
+
+
+def audio_media_type(meeting: Meeting) -> str:
+    """Loại file khi phát lại, suy ra từ đuôi file trên đĩa (do server đặt: "<id><đuôi>").
+
+    Không dùng cột audio_mime → cả những cuộc họp tải lên TRƯỚC bản sửa này (có thể đã lưu
+    loại file giả) cũng được phát an toàn. Đuôi lạ → "application/octet-stream" (trình duyệt
+    chỉ tải về, không mở ra như trang web).
+    """
+    ext = Path(meeting.audio_path or "").suffix.lower()
+    return AUDIO_MIME.get(ext, "application/octet-stream")
 
 
 def delete_audio(meeting: Meeting) -> None:
