@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import CallHost from './components/call/CallHost'
 import Layout from './components/Layout'
 import { Spinner } from './components/ui'
 import AuthPage from './pages/AuthPage'
@@ -43,6 +44,8 @@ export default function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      {/* GĐ6 (phương án B): cuộc họp đang diễn ra sống ở đây, ngoài các trang → đổi trang không rớt cuộc họp */}
+      <CallHost />
     </BrowserRouter>
   )
 }

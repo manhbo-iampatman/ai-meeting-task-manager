@@ -287,15 +287,36 @@ Khung trình duyệt của công cụ lập trình **chặn mic / cam** và ch�
 5. **Tiếng vọng thật** (một người nghe loa ngoài) và ngưỡng 80% / 2 giây có hợp không.
 6. **Rớt mạng / đóng tab** giữa buổi rồi mở lại → ghi âm được gửi nốt và bổ sung.
 
+### Đã thử trên thiết bị thật (20/11/2026)
+
+Laptop + điện thoại trong cùng Wi-Fi, vào `https://192.168.1.100:5173` (chứng chỉ tự ký). Vì lúc thử không tiện nói, trên laptop mở **2 cửa sổ Chrome riêng** dùng **file giọng thay mic** (cờ `--use-fake-device-for-media-stream --use-file-for-fake-audio-capture=…wav`): cửa sổ "Nam" phát lời của Nam, cửa sổ "Lan" phát lời của Lan trong cuộc họp mẫu (file tạo sẵn trong `experiments/data/fake_mic/`, mỗi file có 40 giây im lặng đầu). Điện thoại vào phòng bằng tài khoản thứ ba, **tắt mic**.
+
+| Kiểm tra | Kết quả |
+|---|---|
+| 3 thiết bị / cửa sổ vào cùng một phòng qua LAN + HTTPS | ✅ |
+| Trình duyệt thu "mic" qua nút trộn rồi gửi dần lên máy chủ | ✅ 3 track (Nam 3:08, Lan 2:58, điện thoại 2:31 im lặng) đều về đủ; bấm kết thúc là xử lý ngay (13 giây sau đã xong) |
+| Bản ghi có tên người nói | ✅ 21 câu: 17 câu "Nguyễn Văn Nam", 4 câu "Trần Thị Lan" — **không câu nào gán nhầm người**; điện thoại tắt mic → 0 câu |
+| Không có loa ngoài → không có tiếng vọng | ✅ bỏ 0 câu vọng |
+| Camera, giao diện phòng trên điện thoại | ✅ người làm khóa luận xác nhận bằng mắt |
+| Chia sẻ màn hình từ laptop (Chrome / Edge **bình thường**) → xem trên điện thoại | ✅ người làm khóa luận xác nhận. Lưu ý: cửa sổ Chrome mở với cờ thiết bị giả (`--use-fake-device-for-media-stream`) thì cả camera lẫn màn hình chia sẻ đều bị thay bằng hình mẫu xanh lá của Chrome — không phải lỗi |
+| Chia sẻ màn hình TỪ điện thoại | Không có — đúng thiết kế: trình duyệt trên điện thoại không hỗ trợ chia sẻ màn hình (`getDisplayMedia`) nên nút bị ẩn (xem Hạn chế) |
+| Buổi họp không ai nói (lần thử trước, cuộc họp 13) | ✅ báo lỗi rõ "Không nhận ra lời nói…" |
+
+Lỗi nhỏ của Whisper (không phải của phần ghép): mất chữ "Dạ," đầu câu của Lan; "Minh làm…" nghe thành "mình làm…" (giọng máy đọc, đã biết từ GĐ4).
+
+**Vẫn chưa thử:** mic thật (giọng người), **tiếng vọng thật** (một người nghe bằng loa ngoài), rớt mạng / đóng tab giữa buổi.
+
 ## 11. Hạn chế (nói thật khi bảo vệ)
 
 - Chỉ chạy trong LAN. Người ở xa cần máy chủ có IP công khai (hoặc LiveKit Cloud + Cloudflare Tunnel) — hướng phát triển.
 - Lọc tiếng vọng dựa trên chữ Whisper nghe được: bản vọng bị nghe sai quá nhiều (dưới 80%) sẽ lọt.
 - Người nghe loa ngoài mà nói *chen* đúng lúc người khác nói: hai giọng lẫn trong một track, Whisper có thể ghép thành một câu sai.
 - Một người dùng hai thiết bị cùng tài khoản: LiveKit coi là một người (thiết bị vào sau đẩy thiết bị trước ra).
+- **Điện thoại không chia sẻ màn hình được**: trình duyệt trên điện thoại (Chrome Android, Safari iOS) không cho trang web quay màn hình (`navigator.mediaDevices.getDisplayMedia`), nên MeetFlow ẩn nút này trên điện thoại. Điện thoại vẫn bật cam / mic và xem được màn hình người khác chia sẻ. Muốn chia sẻ từ điện thoại phải làm ứng dụng cài đặt riêng (Android / iOS) — hướng phát triển.
 - Lọc tiếng vọng khi **không ai có mức giọng chuẩn** (mọi câu đều bị vọng) **và** mic lệch độ nhạy ≥ 2 lần **và** mốc thời gian Whisper của hai bản gần như trùng nhau: không còn căn cứ nào chắc chắn, có thể giữ nhầm bản.
 - File nghe lại trộn theo luồng nên không tốn RAM theo độ dài buổi họp, nhưng **bước nhận dạng vẫn nạp nguyên ghi âm của từng người** vào RAM (faster-whisper giải mã cả file): khoảng 230 MB cho track dài 1 giờ, xử lý lần lượt từng người.
 - File `.m4a` (Safari/iOS) bị cụt đuôi chưa cứu được (xem mục 5); `.webm` (Chrome / Edge / Firefox) thì cứu được.
+- Cuộc họp chỉ chạy tiếp khi **chuyển trang bên trong MeetFlow** (mục 14). Chuyển sang **ứng dụng khác** hoặc **khóa màn hình** điện thoại thì tùy máy / trình duyệt có thể ngừng thu mic hoặc ngắt trang chạy nền → ghi âm của người đó có khoảng trống. Wake Lock chỉ giữ màn hình không *tự* tắt, không ngăn người dùng tự khóa máy. Tải lại trang (F5) vẫn là rời phòng. Muốn họp nền thật sự phải làm ứng dụng cài đặt riêng — hướng phát triển.
 
 ## 12. Cải thiện & sửa lỗi logic trước GĐ7 (19/11/2026)
 
@@ -321,6 +342,51 @@ Kiểm lại từng bản sửa bằng cách chạy thử (không chỉ đọc c
 | 4 — cứu file cụt đuôi | (a) Code bắt lỗi bằng `av.AVError`, nhưng PyAV 15 (bản đang dùng) **không còn lớp này** (đổi tên thành `av.FFmpegError`) → gặp gói lỗi giữa chừng thì văng `AttributeError` thay vì "dừng êm, giữ phần đã đọc". Lỗi ẩn vì `.webm` cụt không làm PyAV báo lỗi. (b) Tài liệu ghi cứu được `.m4a` nhưng thử thì không mở được | (a) Dùng `_av_errors()` (nhận cả tên cũ lẫn tên mới). Test `test_decode_error_mid_stream_keeps_audio_read_so_far` giả lập gói hỏng giữa file. (b) Sửa tài liệu, đưa `.m4a` cụt vào Hạn chế |
 | 5 — trộn theo luồng | Đúng, nhưng tài liệu xóa luôn dòng hạn chế về RAM trong khi bước nhận dạng vẫn nạp cả track | Ghi lại đúng phạm vi vào Hạn chế |
 
+
+## 13. Giao diện phòng họp kiểu Google Meet (20/11/2026)
+
+Sau khi thử trên laptop + điện thoại: bản đầu dùng nguyên khung có sẵn của LiveKit → ô người quá to, phải cuộn trang mới thấy người thứ 3, hình người mặc định bị cắt, thanh MeetFlow vẫn chiếm chỗ. Làm lại theo cách bố trí của Google Meet (lựa chọn của người làm khóa luận):
+
+| Phần | Cách làm | File |
+|---|---|---|
+| Toàn màn hình, luôn nền tối | Phòng gắn thẳng vào `<body>` bằng React portal (khung trang có hiệu ứng `transform` nên `position: fixed` bên trong không phủ được thanh MeetFlow); class `dark` + bộ màu riêng `--room-*` | `components/room/ActiveCall.tsx` (trước mục 14 nằm trong `pages/RoomPage.tsx`), `index.css` |
+| Ô tự vừa khung, không cuộn | `fitGrid`: thử mọi số cột, chọn cách cho ô TO NHẤT mà vẫn vừa khung; máy tính ô 16:9, điện thoại dựng đứng ô 3:4 (6 người → lưới 2 cột) | `components/room/layout.ts` |
+| Ô người | Tắt cam → vòng tròn màu + chữ cái đầu tên gọi; tên góc dưới trái; mic tắt góc trên phải; đang nói → viền sáng; hình của mình lật như gương | `components/room/ParticipantCard.tsx` |
+| Bố cục | 2 người → người kia to cả khung, mình ô nổi ở góc; có người chia sẻ màn hình / có người được ghim → khung lớn + dải ô (máy tính: bên phải; điện thoại: phía dưới) | `components/room/MeetingStage.tsx` |
+| Thanh nút | Máy tính: [giờ \| tên phòng] [mic, cam, chia sẻ, giơ tay, ghi âm, nút đỏ rời phòng + mũi tên "Kết thúc cho mọi người"] [Thông tin, Người tham gia]. Điện thoại: mic, cam, giơ tay, ⋯, rời phòng; mục còn lại trong tấm trượt ⋯ | `components/room/RoomControls.tsx` |
+| Người tham gia / Thông tin | Khung bên phải (điện thoại: tấm trượt từ dưới); người giơ tay lên đầu; nút ghim; link mời | `components/room/RoomPanels.tsx` |
+| Giơ tay ✋ | Thuộc tính `hand` (= thời điểm giơ) của chính người đó trong LiveKit → mọi người thấy ngay, người vào sau cũng thấy; thông báo nổi "X đang giơ tay". Vé vào phòng thêm quyền `canUpdateOwnMetadata` (chỉ tự sửa thuộc tính CỦA MÌNH; không ảnh hưởng bản ghi vì tên người nói lấy từ tài khoản ở backend) | `core/livekit.py` |
+| Ghim | Chỉ trên máy mình (không làm thay đổi màn hình người khác) | |
+
+**Đã thử trong trình duyệt (3 tài khoản test, máy tính 1280×720 và điện thoại 375×812):** 1 người → 1 ô vừa khung; 2 người → ô nổi ở góc; 3 người → máy tính 2 + 1 ô 16:9, điện thoại lưới 2 cột ô đứng; giơ tay → người khác thấy thông báo + nhãn trên ô + số đếm trên nút Người tham gia; ghim → khung lớn + dải ô; menu ⋯ trên điện thoại; "Kết thúc cho mọi người" → mọi người thấy "Buổi họp đã kết thúc"; không có lỗi trong console. Camera / mic / chia sẻ màn hình thật cần thử lại trên thiết bị thật (trình duyệt của công cụ lập trình chặn thiết bị).
+
+## 14. Cuộc họp chạy tiếp khi chuyển trang — ô thu nhỏ (20/11/2026)
+
+**Vấn đề (người làm khóa luận phát hiện khi thử trên điện thoại):** đang họp mà vuốt từ mép màn hình (cử chỉ *Quay lại*) là **rời luôn cuộc họp**, ghi âm của người đó cũng dừng. Nguyên nhân: kết nối LiveKit nằm BÊN TRONG trang phòng họp. Quay lại = rời trang → React gỡ trang ra → gỡ luôn kết nối.
+
+**Cách sửa (giống Google Meet / Zoom bản web — lựa chọn của người làm khóa luận):** tách kết nối ra khỏi trang. Cuộc họp gắn với **cả ứng dụng**; rời trang phòng thì cuộc họp **thu nhỏ thành ô nổi ở góc** thay vì tắt. Làm cho cả laptop lẫn điện thoại.
+
+| Phần | Cách làm | File |
+|---|---|---|
+| Cuộc họp đang diễn ra | Vé vào phòng + mic / cam đã chọn lưu trong một "kho" dùng chung của ứng dụng (zustand), không lưu trong trang. Cố ý **không** lưu xuống trình duyệt: tải lại trang (F5) là rời phòng, vé chỉ dùng một lần | `stores/call.ts` |
+| Nơi giữ kết nối | `CallHost` đặt **ngoài danh sách trang** (trong `App.tsx`, cạnh `<Routes>`) nên đổi trang không bị gỡ. Thư viện LiveKit (~700KB) vẫn chỉ tải khi đang họp (lazy loading) — trang chính không nặng thêm | `components/call/CallHost.tsx`, `components/room/ActiveCall.tsx` |
+| Hai chế độ hiển thị | Đang ở `/room/<mã>` → toàn màn hình; trang khác → ô nhỏ. **Cùng một kết nối**, chỉ đổi lớp CSS (khung ngoài `display: contents` = như không có hộp). Máy ghi âm, giơ tay, thông báo, phần phát tiếng không bị dựng lại nên tiếng không bị ngắt | `components/room/LiveRoom.tsx`, `index.css` (`.mf-room-mini`) |
+| Ô thu nhỏ | Hình người đang nói (ưu tiên màn hình người khác đang chia sẻ; im lặng thì giữ người nói gần nhất), chấm đỏ khi phòng đang ghi âm, nút **mic / rời phòng / phóng to**; chạm vào hình cũng phóng to. **Kéo đi chỗ khác được** bằng chuột hoặc ngón tay (Pointer Events; kéo quá 6px mới tính là kéo, ít hơn là chạm), luôn nằm trọn trong màn hình. Máy tính rộng 288px, điện thoại 176px | `components/room/MiniCall.tsx` |
+| Quay lại = thu nhỏ | Lúc vào phòng, nếu trang phòng là **trang đầu tiên** của tab (mở link mời từ Zalo, vừa đăng nhập xong…) thì chèn trang nhóm vào phía sau trong lịch sử trình duyệt. Nhờ vậy Quay lại luôn về trang nhóm → thu nhỏ, không văng khỏi MeetFlow | `pages/RoomPage.tsx` (`enterCall`) |
+| Giữ màn hình sáng | **Screen Wake Lock API**: xin khi vào phòng, xin lại khi quay lại tab (trình duyệt tự nhả khi ẩn tab), nhả khi rời phòng. Trình duyệt không hỗ trợ / từ chối (pin yếu…) thì bỏ qua, cuộc họp vẫn chạy | `components/room/ActiveCall.tsx` (`useWakeLock`) |
+| Cuộc họp kết thúc lúc đang thu nhỏ | Không kéo người dùng khỏi trang đang xem; hiện thẻ nhỏ ở góc: *Bạn đã rời phòng họp* (tự ẩn sau 4 giây, trừ khi ghi âm còn đang gửi), *Buổi họp đã kết thúc* (nút xem kết quả → link bản ghi), *Mất kết nối* (nút vào lại) | `components/call/CallEndedNotice.tsx` |
+| Đang họp phòng nhóm X mà mở link phòng nhóm Y (người ở 2 nhóm) | Chưa cho vào phòng nhóm Y, nhắc rời phòng nhóm X trước — mỗi lúc chỉ họp một phòng (lựa chọn của người làm khóa luận: đơn giản, không vô tình rời phòng cũ). Cùng một nhóm thì không có 2 phòng vì mỗi nhóm chỉ mở một phòng | `pages/RoomPage.tsx` |
+| Cảnh báo khi đóng tab | Chuyển lên `CallHost` → cảnh báo ở **mọi trang** khi đang họp hoặc còn ghi âm chưa gửi xong | `components/call/CallHost.tsx` |
+
+**Đã thử trong trình duyệt (2 tài khoản test, máy tính và khung điện thoại 375×812):**
+- Vào phòng bằng nút "Online Meeting" và bằng **link mời mở thẳng** (trang đầu tiên của tab) → toàn màn hình; Quay lại → về trang nhóm, ô nhỏ hiện hình người kia; sang trang "Việc của tôi" ô vẫn còn; chạm vào hình → toàn màn hình lại mà **không phải vào phòng lại** (chỉ 1 lần gọi API `join`).
+- **Ghi âm vẫn chạy khi thu nhỏ:** bật ghi rồi thu nhỏ, chuyển trang → máy chủ vẫn nhận đều 1 khúc / 3 giây (4 khúc trong 12 giây); kết thúc → sinh cuộc họp có bản ghi như bình thường.
+- Thành viên bấm rời ở ô nhỏ → ở lại trang đang xem, thẻ báo tự ẩn. Chủ phòng bấm rời ở ô nhỏ → hộp thoại chủ phòng phủ lên trên trang. Chủ phòng kết thúc → người đang thu nhỏ thấy "Buổi họp đã kết thúc" → bấm xem kết quả ra đúng trang kết quả + link bản ghi.
+- Kéo ô (giả lập sự kiện con trỏ): ô dịch đúng quãng kéo; chạm không kéo → phóng to.
+- Wake Lock được xin đúng lúc vào phòng (khung thử của công cụ lập trình từ chối → code bỏ qua êm). Không có lỗi mới trong console; `tsc` + build đạt, LiveKit vẫn nằm ở gói tải riêng.
+
+**Chưa thử trên thiết bị thật:** vuốt Quay lại trên điện thoại, kéo ô bằng ngón tay, màn hình có thật sự không tự tắt khi họp lâu, mất mạng lúc đang thu nhỏ.
+
 ---
 
 ## Hội đồng hỏi thì trả lời
@@ -330,6 +396,7 @@ Kiểm lại từng bản sửa bằng cách chạy thử (không chỉ đọc c
 - **"Ghi âm có xin phép không?"** Chỉ chủ phòng / trưởng nhóm bật được; mọi người thấy chấm đỏ và dòng thông báo; người vào sau được báo ngay ở màn hình chờ; tắt mic thì không ghi. Ghi âm lưu trên máy chủ của nhóm, Whisper chạy tại chỗ.
 - **"Đồng hồ các máy lệch nhau thì sao?"** Không dùng đồng hồ của trình duyệt; máy chủ đóng dấu giờ khi mỗi máy ghi bắt đầu.
 - **"Chủ phòng rớt mạng thì ai tắt được phòng?"** Trưởng nhóm luôn tắt được. Ngoài ra chủ phòng vắng quá 1 phút thì quyền tự chuyển cho người vào sớm nhất còn lại; mọi người rời hết thì phòng tự đóng sau 30 giây.
+- **"Đang họp mà bấm sang trang khác (hoặc vuốt Quay lại) thì sao?"** Cuộc họp không tắt mà thu nhỏ thành ô ở góc, ghi âm vẫn chạy — vì kết nối được giữ ở cấp ứng dụng chứ không nằm trong trang phòng họp. Chạm vào ô là về lại toàn màn hình.
 - **"Một người rớt mạng thì cả nhóm phải chờ?"** Chờ tối đa 2 phút, sau đó xử lý với phần đã có và ghi rõ thiếu của ai; phần về muộn được bổ sung.
 
 ## Tự kiểm tra
@@ -349,3 +416,4 @@ Kiểm lại từng bản sửa bằng cách chạy thử (không chỉ đọc c
 13. Vì sao không dùng diarization (pyannote)?
 14. "Để em làm ạ" và "Em làm phần này nhé" được xử lý khác nhau thế nào? Ai quyết định: LLM hay code?
 15. Những gì trong giai đoạn này CHƯA được thử bằng thực tế?
+16. Vì sao bản đầu vuốt Quay lại là rời phòng? Phương án B giữ cuộc họp bằng cách nào? Vì sao tải lại trang thì vẫn rời phòng, và chuyển sang ứng dụng khác thì không chắc giữ được?

@@ -241,7 +241,9 @@ Công cụ: thư viện `jiwer`.
 - [x] Ghi âm riêng từng người, gửi dần lên máy chủ
 - [x] Ghép bản ghi có tên người nói, lọc tiếng vọng, đưa vào pipeline GĐ4
 - [x] Dùng tên người nói để giao việc "để em làm" cho đúng người
-- [ ] Thử với hai thiết bị thật trong cùng Wi-Fi (mic thật, cam, chia sẻ màn hình) — xem mục 10 của `GIAI_THICH_GIAI_DOAN_6.md`
+- [x] Thử với hai thiết bị thật trong cùng Wi-Fi (laptop + điện thoại, 20/11/2026): vào phòng, camera, giao diện điện thoại, laptop chia sẻ màn hình → điện thoại xem được (điện thoại tự chia sẻ thì không được — giới hạn của trình duyệt), ghi âm từng người, bản ghi đúng tên người nói — dùng file giọng thay mic
+- [x] Giao diện phòng kiểu Google Meet (giơ tay, ghim) + cuộc họp chạy tiếp khi chuyển trang (ô thu nhỏ, Quay lại = thu nhỏ, giữ màn hình sáng) — 20/11/2026, đã thử trong trình duyệt (máy tính + khung điện thoại); còn thử trên điện thoại thật
+- [ ] Còn lại: mic thật (giọng người), tiếng vọng thật (loa ngoài), rớt mạng giữa buổi — xem mục 10 của `GIAI_THICH_GIAI_DOAN_6.md`
 - **Kiến thức cần nắm:** WebRTC (SFU, ICE/STUN/TURN), vì sao trình duyệt bắt buộc HTTPS mới cho dùng cam / mic, JWT cấp quyền vào phòng, vì sao ghi riêng từng người thay cho tách người nói bằng AI (diarization)
 
 ### Giai đoạn 7 – Thực nghiệm (Tuần 11: 25/01 – 31/01)
@@ -439,6 +441,8 @@ Chi tiết và lý do: `docs/GIAI_THICH_GIAI_DOAN_5.md`.
 | Phòng được tạo lúc nào *(18/11, sau khi thử 2 máy)* | **Chỉ khi người mở bấm "Vào phòng"** ở màn hình chờ. Bấm "Online Meeting" rồi quay lại thì không có phòng nào được tạo (trước đó phòng được tạo ngay lúc bấm nút, để lại "phòng ma" làm người khác thấy nút "Tham gia phòng") |
 | Số người tối đa | **6** |
 | Trong phòng có gì | Cam, mic, chia sẻ màn hình, danh sách người tham gia. **Không** có chat, không có phụ đề trực tiếp |
+| Giao diện trong phòng *(20/11, sau khi thử laptop + điện thoại)* | **Kiểu Google Meet**: toàn màn hình, luôn nền tối, ô tự vừa khung không cuộn; thêm **giơ tay** và **ghim** (chỉ trên máy mình). Không có biểu cảm (reaction), không chat |
+| Đang họp mà chuyển trang / vuốt Quay lại *(20/11, sau khi thử điện thoại)* | **Cuộc họp chạy tiếp, thu nhỏ thành ô nổi** ở góc (hình người đang nói, chấm ghi âm, nút mic / rời / phóng to, kéo đi chỗ khác được; điện thoại ô nhỏ hơn) — cả laptop lẫn điện thoại. **Quay lại = thu nhỏ**, không rời phòng. **Giữ màn hình sáng** (Wake Lock) trong lúc họp. Chuyển sang ứng dụng khác / khóa máy: giới hạn của web, để hướng phát triển (ứng dụng cài đặt) |
 | Ghi gì | **Chỉ ghi âm, riêng từng người** (AI không dùng hình; ghi hình rất nặng) |
 | Bật ghi âm | **Chủ phòng bấm "Bắt đầu ghi"**; mọi người thấy chấm đỏ "Đang ghi âm" (minh bạch, quyền riêng tư) |
 | Ghi mấy lần | **Ghi một mạch**: bấm một lần, ghi tới khi chủ phòng bấm "Dừng ghi" hoặc kết thúc phòng. Đã dừng thì buổi đó không ghi lại |

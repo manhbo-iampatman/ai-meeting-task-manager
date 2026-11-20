@@ -330,3 +330,39 @@ progress {
   max-height: none;
   flex-shrink: 0;
 }
+
+/* Trong phòng họp (kiểu Google Meet): LUÔN nền tối, dù app đang giao diện sáng.
+   Phòng họp có class `dark` → chữ / màu nhấn theo bảng màu tối; nền dùng bộ biến riêng dưới đây. */
+/* CSS của LiveKit (.lk-room-container: position relative, nền #111) nằm NGOÀI @layer nên thắng class
+   Tailwind → khai báo lại với độ ưu tiên cao hơn để phòng họp thật sự phủ toàn màn hình. */
+.mf-room.lk-room-container {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--room-bg);
+}
+/* Cuộc họp thu nhỏ (đang xem trang khác): khung ngoài của LiveKit không chiếm chỗ, không che gì
+   (display: contents = như không có hộp), chỉ còn ô nổi ở góc. Biến màu / class `dark` vẫn truyền xuống. */
+.mf-room.mf-room-mini.lk-room-container {
+  display: contents;
+}
+.mf-room {
+  --room-bg: #0d1017;
+  --room-tile: #232a37;
+  --room-panel: #171d29;
+  --room-button: #2c3444;
+  --room-button-hover: #3a4357;
+  background: var(--room-bg);
+  color: #fff;
+}
+/* Mũi tên chọn mic / camera cạnh nút tròn */
+.mf-room .mf-device-menu .lk-button {
+  height: 2.75rem;
+  padding: 0 0.35rem 0 0.55rem;
+  border-radius: 9999px;
+  background: transparent;
+  color: #fff;
+}
+.mf-room .mf-device-menu .lk-button:hover {
+  background: rgb(255 255 255 / 0.08);
+}
